@@ -34,6 +34,8 @@ import {
   getProjections,
 } from "@/services/dashboardPlus.service";
 
+import { apiFetch } from "@/lib/api";
+
 type Section = "overview" | "finance" | "sales" | "stock";
 type FinanceTab =
   | "medias"
@@ -51,6 +53,46 @@ function currentMonthYYYYMM() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
+function lastNMonths(n: number) {
+  const out: string[] = [];
+  const d = new Date();
+  d.setDate(1);
+  for (let i = n - 1; i >= 0; i--) {
+    const dd = new Date(d);
+    dd.setMonth(dd.getMonth() - i);
+    const mm = String(dd.getMonth() + 1).padStart(2, "0");
+    out.push(mm);
+  }
+  return out;
+}
+
+function normalizeMonthLabel(raw: any) {
+  const s = String(raw ?? "");
+  // "2026-03" => "03"
+  if (s.includes("-")) {
+    const parts = s.split("-");
+    const mm = parts[1] || "";
+    return String(mm).padStart(2, "0");
+  }
+  // "03" => "03" | "3" => "03"
+  const mm = s.slice(-2);
+  const num = Number(mm);
+  if (!Number.isNaN(num)) return String(num).padStart(2, "0");
+  return "00";
+}
+
+function extractCount(data: any) {
+  if (!data) return 0;
+  if (typeof data.total === "number") return data.total;
+  if (typeof data.count === "number") return data.count;
+  if (typeof data?.meta?.total === "number") return data.meta.total;
+  if (typeof data?.pagination?.total === "number") return data.pagination.total;
+  if (Array.isArray(data.items)) return data.items.length;
+  if (Array.isArray(data.data)) return data.data.length;
+  if (Array.isArray(data)) return data.length;
+  return 0;
+}
+
 export default function DashboardClient() {
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -65,8 +107,6 @@ export default function DashboardClient() {
     () => [
       { key: "overview", label: "Visão Geral" },
       { key: "finance", label: "Financeiro" },
-      { key: "sales", label: "Vendas" },
-      { key: "stock", label: "Estoque" },
     ],
     []
   );
@@ -103,6 +143,26 @@ export default function DashboardClient() {
   const [dfcData, setDfcData] = useState<any>(null);
   const [projData, setProjData] = useState<any>(null);
 
+  // ✅ NOVO: total de clientes real
+  const [clientsCount, setClientsCount] = useState<number>(0);
+
+  async function loadClientsCount() {
+    try {
+      // tenta versão paginada (se existir)
+      let data: any = null;
+      try {
+        data = await apiFetch(`/api/clients?take=1`, { auth: true });
+      } catch {
+        data = await apiFetch(`/api/clients`, { auth: true });
+      }
+
+      const count = extractCount(data);
+      if (count >= 0) setClientsCount(count);
+    } catch {
+      // deixa o valor atual (0) — não quebra o dashboard
+    }
+  }
+
   async function loadDashCore() {
     setDashLoading(true);
     setDashErr(null);
@@ -118,6 +178,17 @@ export default function DashboardClient() {
       setDfcData(dfc);
       setProjData(proj);
       setOverviewData(overview);
+
+      // ✅ se backend já mandar count em algum lugar, usa
+      const maybe =
+        Number(overview?.clientsCount) ||
+        Number(overview?.kpis?.clientsCount) ||
+        Number(plus?.cards?.clientsCount) ||
+        Number(plus?.cards?.clients) ||
+        0;
+
+      if (maybe > 0) setClientsCount(maybe);
+      else loadClientsCount();
     } catch (e: any) {
       setDashErr(e?.message || "Erro ao carregar Dashboard Plus.");
     } finally {
@@ -142,7 +213,6 @@ export default function DashboardClient() {
   const bankCents = dfcData?.real?.finalBalanceCents ?? 0;
   const revenueCents = plusData?.cards?.revenueCents ?? 0;
   const profitCents = plusData?.cards?.profitCents ?? 0;
-  const clientsCount = 0;
 
   const kpis = useMemo(
     () => [
@@ -171,7 +241,7 @@ export default function DashboardClient() {
         label: "Clientes",
         value: String(clientsCount),
         icon: Users,
-        hint: "Base total (placeholder)",
+        hint: "Base total (Clientes)",
         tone: "neutral" as const,
       },
     ],
@@ -206,7 +276,7 @@ export default function DashboardClient() {
     }));
   }, [plusData]);
 
-  // ✅ NOVO: Semana (Pagamentos/Recebimentos) + Preview entregas
+  // ✅ Semana (Pagamentos/Recebimentos) + Preview entregas
   const weekWindow = useMemo(() => {
     const start = new Date();
     start.setHours(0, 0, 0, 0);
@@ -253,24 +323,38 @@ export default function DashboardClient() {
     return (Array.isArray(list) ? list : []).slice(0, 3);
   }, [overviewData]);
 
-  // ====== gráfico (usa série do PLUS quando existir; senão placeholder) ======
+  // ✅ AJUSTADO: gráfico (sempre 6 pontos + label MM)
   const chartPoints = useMemo(() => {
-    const labels: string[] = (plusData?.series?.labels || []).map((x: any) => String(x).slice(5)); // MM
-    const revenue: number[] = plusData?.series?.revenueCents || [];
-    if (labels.length && revenue.length) {
-      return labels.map((lab, i) => ({ label: lab, valueCents: revenue[i] || 0 }));
+    const labelsRaw =
+      plusData?.series?.labels ??
+      plusData?.series?.months ??
+      plusData?.series?.keys ??
+      [];
+    const valuesRaw =
+      plusData?.series?.revenueCents ??
+      plusData?.series?.revenue ??
+      plusData?.series?.valuesCents ??
+      [];
+
+    if (Array.isArray(labelsRaw) && Array.isArray(valuesRaw) && labelsRaw.length && valuesRaw.length) {
+      const n = Math.min(labelsRaw.length, valuesRaw.length);
+      const start = Math.max(0, n - 6);
+      const pts = [];
+      for (let i = start; i < n; i++) {
+        pts.push({
+          label: normalizeMonthLabel(labelsRaw[i]),
+          valueCents: Number(valuesRaw[i]) || 0,
+        });
+      }
+      // garante 6 sempre (caso backend mande menos)
+      while (pts.length < 6) {
+        pts.unshift({ label: "00", valueCents: 0 });
+      }
+      return pts;
     }
 
-    return [
-      { label: "Jan", valueCents: 2100000 },
-      { label: "Fev", valueCents: 2400000 },
-      { label: "Mar", valueCents: 1800000 },
-      { label: "Abr", valueCents: 2600000 },
-      { label: "Mai", valueCents: 3200000 },
-      { label: "Jun", valueCents: 2900000 },
-      { label: "Jul", valueCents: 3600000 },
-      { label: "Ago", valueCents: 4100000 },
-    ];
+    // fallback: últimos 6 meses com zero (não quebra a UI)
+    return lastNMonths(6).map((mm) => ({ label: mm, valueCents: 0 }));
   }, [plusData]);
 
   // ====== tabelas de DRE / DFC / Projeção ======
@@ -299,7 +383,6 @@ export default function DashboardClient() {
     [dfcData]
   );
 
-  // ✅ NOVO: Resumo para os 4 cards do Financeiro
   const dfcTotals = useMemo(() => {
     const s = Array.isArray(dfcSeries) ? dfcSeries : [];
     const inCents = s.reduce((acc: number, r: any) => acc + (Number(r.inCents) || 0), 0);
@@ -441,7 +524,6 @@ export default function DashboardClient() {
       {section === "overview" ? (
         <section className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]" data-stagger>
           <div className="grid gap-3">
-            {/* ✅ AJUSTADO: Próximas entregas (agora renderiza dados reais) */}
             <GlassCard className="p-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -508,7 +590,6 @@ export default function DashboardClient() {
             />
           </div>
 
-          {/* ✅ AJUSTADO: Semana (pagamentos/recebimentos) */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <GlassCard className="p-4">
               <div className="flex items-center justify-between gap-2">
@@ -599,11 +680,7 @@ export default function DashboardClient() {
 
       {section === "finance" ? (
         <section className="space-y-3" data-stagger>
-          <Tabs
-            items={financeTabs}
-            value={financeTab}
-            onChange={(k) => setFinanceTab(k as FinanceTab)}
-          />
+          <Tabs items={financeTabs} value={financeTab} onChange={(k) => setFinanceTab(k as FinanceTab)} />
 
           {financeTab === "receber" ? (
             <DataTable
@@ -615,11 +692,7 @@ export default function DashboardClient() {
                 { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
                 { header: "Cliente", cell: (r: any) => r.client },
                 { header: "Descrição", cell: (r: any) => r.desc },
-                {
-                  header: "Valor",
-                  className: "text-right font-extrabold",
-                  cell: (r: any) => moneyBRLFromCents(r.amountCents),
-                },
+                { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
                 {
                   header: "Status",
                   cell: (r: any) =>
@@ -632,7 +705,6 @@ export default function DashboardClient() {
               ]}
             />
           ) : financeTab === "pagar" ? (
-            // ✅ AJUSTADO: aba pagar usa payRows e texto correto
             <DataTable
               title="Pagáveis"
               subtitle="..."
@@ -642,11 +714,7 @@ export default function DashboardClient() {
                 { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
                 { header: "Fornecedor", cell: (r: any) => r.supplier },
                 { header: "Descrição", cell: (r: any) => r.desc },
-                {
-                  header: "Valor",
-                  className: "text-right font-extrabold",
-                  cell: (r: any) => moneyBRLFromCents(r.amountCents),
-                },
+                { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
                 {
                   header: "Status",
                   cell: (r: any) =>
@@ -664,43 +732,16 @@ export default function DashboardClient() {
                 {financeTabs.find((t) => t.key === financeTab)?.label}
               </div>
               <div className="mt-2 text-sm font-semibold text-[color:var(--muted)]">
-                Agora já está ligado no backend. Se algum bloco vier vazio, é porque não há dados no
-                período.
+                Agora já está ligado no backend. Se algum bloco vier vazio, é porque não há dados no período.
               </div>
 
-              {/* ✅ AJUSTADO: cards agora puxam números reais */}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard
-                  label="Entradas"
-                  value={moneyBRLFromCents(dfcTotals.inCents)}
-                  icon={ArrowUpCircle}
-                  hint={`Total do mês (DFC real) • ${endMonth}`}
-                  tone="success"
-                />
-                <KpiCard
-                  label="Saídas"
-                  value={moneyBRLFromCents(dfcTotals.outCents)}
-                  icon={ArrowDownCircle}
-                  hint={`Total do mês (DFC real) • ${endMonth}`}
-                  tone="danger"
-                />
-                <KpiCard
-                  label="Relatório DRE"
-                  value={moneyBRLFromCents(dreOperatingCents)}
-                  icon={FileText}
-                  hint={`Lucro operacional (DRE) • ${endMonth}`}
-                  tone="brand"
-                />
-                <KpiCard
-                  label="Fluxo projetado"
-                  value={moneyBRLFromCents(projectedFinalCents)}
-                  icon={TrendingUp}
-                  hint={`Saldo final projetado (DFC) • ${endMonth}`}
-                  tone="neutral"
-                />
+                <KpiCard label="Entradas" value={moneyBRLFromCents(dfcTotals.inCents)} icon={ArrowUpCircle} hint={`Total do mês (DFC real) • ${endMonth}`} tone="success" />
+                <KpiCard label="Saídas" value={moneyBRLFromCents(dfcTotals.outCents)} icon={ArrowDownCircle} hint={`Total do mês (DFC real) • ${endMonth}`} tone="danger" />
+                <KpiCard label="Relatório DRE" value={moneyBRLFromCents(dreOperatingCents)} icon={FileText} hint={`Lucro operacional (DRE) • ${endMonth}`} tone="brand" />
+                <KpiCard label="Fluxo projetado" value={moneyBRLFromCents(projectedFinalCents)} icon={TrendingUp} hint={`Saldo final projetado (DFC) • ${endMonth}`} tone="neutral" />
               </div>
 
-              {/* ✅ conteúdo real por aba (add-on) */}
               {financeTab === "breakeven" ? (
                 <div className="mt-4">
                   <DataTable
@@ -710,21 +751,9 @@ export default function DashboardClient() {
                     rowKey={(r: any, i: number) => r.month || `m_${i}`}
                     columns={[
                       { header: "Mês", cell: (r: any) => r.month },
-                      {
-                        header: "Entradas",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.expectedInCents || 0),
-                      },
-                      {
-                        header: "Saídas",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.expectedOutCents || 0),
-                      },
-                      {
-                        header: "Saldo",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.netCents || 0),
-                      },
+                      { header: "Entradas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.expectedInCents || 0) },
+                      { header: "Saídas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.expectedOutCents || 0) },
+                      { header: "Saldo", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.netCents || 0) },
                     ]}
                   />
                 </div>
@@ -739,21 +768,9 @@ export default function DashboardClient() {
                     rowKey={(r: any, i: number) => r.day || `d_${i}`}
                     columns={[
                       { header: "Dia", cell: (r: any) => String(r.day).slice(8) },
-                      {
-                        header: "Entradas",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.inCents || 0),
-                      },
-                      {
-                        header: "Saídas",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.outCents || 0),
-                      },
-                      {
-                        header: "Saldo",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.netCents || 0),
-                      },
+                      { header: "Entradas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.inCents || 0) },
+                      { header: "Saídas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.outCents || 0) },
+                      { header: "Saldo", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.netCents || 0) },
                     ]}
                   />
                 </div>
@@ -768,11 +785,7 @@ export default function DashboardClient() {
                     rowKey={(r: any, i: number) => `${r.k}_${i}`}
                     columns={[
                       { header: "Linha", cell: (r: any) => r.k },
-                      {
-                        header: "Valor",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => r.v,
-                      },
+                      { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => r.v },
                     ]}
                   />
                 </div>
@@ -787,21 +800,9 @@ export default function DashboardClient() {
                     rowKey={(r: any, i: number) => r.day || `p_${i}`}
                     columns={[
                       { header: "Dia", cell: (r: any) => String(r.day).slice(8) },
-                      {
-                        header: "Entradas",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.inCents || 0),
-                      },
-                      {
-                        header: "Saídas",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.outCents || 0),
-                      },
-                      {
-                        header: "Saldo",
-                        className: "text-right font-extrabold",
-                        cell: (r: any) => moneyBRLFromCents(r.netCents || 0),
-                      },
+                      { header: "Entradas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.inCents || 0) },
+                      { header: "Saídas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.outCents || 0) },
+                      { header: "Saldo", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.netCents || 0) },
                     ]}
                   />
                 </div>
@@ -815,19 +816,11 @@ export default function DashboardClient() {
                     rows={overviewData?.upcomingDeliveries || []}
                     rowKey={(r: any, i: number) => r.id || `o_${i}`}
                     columns={[
-                      {
-                        header: "Código",
-                        cell: (r: any) => String(r.id || "").slice(-6).toUpperCase(),
-                      },
+                      { header: "Código", cell: (r: any) => String(r.id || "").slice(-6).toUpperCase() },
                       { header: "Cliente", cell: (r: any) => r.client?.name || "-" },
                       { header: "Criado", cell: (r: any) => isoToBR(r.createdAt) },
                       { header: "Entrega", cell: (r: any) => isoToBR(r.expectedDeliveryAt) },
-                      {
-                        header: "Status",
-                        cell: (r: any) => (
-                          <StatusPill tone="neutral" label={String(r.status || "-")} />
-                        ),
-                      },
+                      { header: "Status", cell: (r: any) => <StatusPill tone="neutral" label={String(r.status || "-")} /> },
                     ]}
                   />
                 </div>
@@ -837,28 +830,7 @@ export default function DashboardClient() {
         </section>
       ) : null}
 
-      {section === "sales" ? (
-        <GlassCard className="p-5" data-stagger>
-          <div className="font-display text-sm font-black text-[color:var(--ink)]">Vendas</div>
-          <div className="mt-2 text-sm font-semibold text-[color:var(--muted)]">
-            Aqui entra o painel de pedidos + modal completo (já feito em /vendas).
-          </div>
-        </GlassCard>
-      ) : null}
-
-      {section === "stock" ? (
-        <GlassCard className="p-5" data-stagger>
-          <div className="font-display text-sm font-black text-[color:var(--ink)]">Estoque</div>
-          <div className="mt-2 text-sm font-semibold text-[color:var(--muted)]">
-            Aqui entra Catálogo/Movimentações/Quantidade/Histórico (já feito em /estoque).
-          </div>
-          <div className="mt-4">
-            <Badge tone="wood">
-              <Boxes className="h-3.5 w-3.5" /> Estoque premium
-            </Badge>
-          </div>
-        </GlassCard>
-      ) : null}
+     
     </div>
   );
 }

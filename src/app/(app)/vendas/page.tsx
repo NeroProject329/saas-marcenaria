@@ -604,10 +604,11 @@ export default function VendasPage() {
       {/* MODAL PEDIDO (COMPLETO) */}
       <Modal
         open={open}
-        title={editing ? "Editar pedido" : "Novo pedido"}
-        subtitle="POST /api/orders • PATCH /api/orders/:id/full"
-        onClose={() => setOpen(false)}
-        footer={
+  title={editing ? "Editar pedido" : "Novo pedido"}
+  subtitle="POST /api/orders • PATCH /api/orders/:id/full"
+  onClose={() => setOpen(false)}
+  maxWidth="max-w-[1180px]"
+  footer={
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               {form.paymentMode === "PARCELADO" ? (
@@ -691,8 +692,9 @@ export default function VendasPage() {
                 </Button>
               </div>
 
-              <div className="mt-3 overflow-auto rounded-2xl border border-[color:var(--line)] bg-white/35">
-                <table className="min-w-[980px] w-full text-sm">
+              <div className="mt-3 overflow-x-auto lg:overflow-x-hidden rounded-2xl border border-[color:var(--line)] bg-white/35">
+                <table className="w-full min-w-0 table-fixed text-sm">
+                  <colgroup><col /><col className="w-[110px]" /><col className="w-[180px]" /><col className="w-[140px]" /><col className="w-[90px]" /></colgroup>
                   <thead className="bg-white/55">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Descrição</th>
@@ -846,8 +848,9 @@ export default function VendasPage() {
                       </div>
                     </div>
 
-                    <div className="sm:col-span-2 overflow-auto rounded-2xl border border-[color:var(--line)] bg-white/35">
-                      <table className="min-w-[720px] w-full text-sm">
+                    <div className="sm:col-span-2 overflow-x-auto lg:overflow-x-hidden rounded-2xl border border-[color:var(--line)] bg-white/35">
+                      <table className="w-full min-w-0 table-fixed text-sm">
+                       <colgroup><col className="w-[220px]" /><col /></colgroup>
                         <thead className="bg-white/55">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Vencimento</th>

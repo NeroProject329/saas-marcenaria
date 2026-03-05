@@ -1,9 +1,21 @@
 "use client";
 
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
-import { cn } from "@/lib/cn";
-import GlassCard from "./GlassCard";
+
+import GlassCard from "@/components/ui/GlassCard";
+import Button from "@/components/ui/Button";
+
+type ModalProps = {
+  open: boolean;
+  title?: React.ReactNode;
+  subtitle?: React.ReactNode;
+  onClose: () => void;
+  children: React.ReactNode;
+  footer?: React.ReactNode;
+  maxWidth?: string; // ex: "max-w-[880px]"
+};
 
 export default function Modal({
   open,
@@ -12,28 +24,23 @@ export default function Modal({
   onClose,
   children,
   footer,
-  className,
-  maxWidth = "max-w-[920px]",
-}: {
-  open: boolean;
-  title: string;
-  subtitle?: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  footer?: React.ReactNode;
-  className?: string;
-  maxWidth?: string;
-}) {
+  maxWidth = "max-w-[760px]",
+}: ModalProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => setMounted(true), []);
+
+  // ESC pra fechar
   useEffect(() => {
     if (!open) return;
-
-    const onKey = (e: KeyboardEvent) => {
+    const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
     };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  // trava scroll do body
   useEffect(() => {
     if (!open) return;
     const prev = document.body.style.overflow;
@@ -43,49 +50,57 @@ export default function Modal({
     };
   }, [open]);
 
-  if (!open) return null;
+  if (!open || !mounted) return null;
 
-  return (
-    <div className="fixed inset-0 z-[1000] flex items-center justify-center p-3 sm:p-5">
+  return createPortal(
+    <div className="fixed inset-0 z-[100]">
+      {/* overlay */}
       <button
-        className="absolute inset-0 bg-black/35 backdrop-blur-sm"
-        onClick={onClose}
+        type="button"
         aria-label="Fechar modal"
+        onClick={onClose}
+        className="absolute inset-0 bg-black/40 backdrop-blur-[2px]"
       />
 
-      <GlassCard
-        className={cn(
-          "relative w-full overflow-hidden",
-          maxWidth,
-          "max-h-[92dvh] flex flex-col",
-          className
-        )}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-[color:var(--line)] bg-white/40 p-4 sm:p-5">
-          <div className="min-w-0">
-            <div className="font-display text-lg font-black text-[color:var(--ink)] sm:text-xl">
-              {title}
+      {/* container centralizado */}
+      <div className="relative z-[101] flex min-h-full items-center justify-center p-4 sm:p-6">
+        <div className={`w-full ${maxWidth} my-6`}>
+          <GlassCard className="overflow-hidden p-0">
+            {/* header */}
+            <div className="flex items-start justify-between gap-3 border-b border-[color:var(--line)] bg-white/35 px-5 py-4">
+              <div className="min-w-0">
+                {title ? (
+                  <div className="truncate font-display text-base font-black text-[color:var(--ink)]">
+                    {title}
+                  </div>
+                ) : null}
+                {subtitle ? (
+                  <div className="mt-1 text-sm font-semibold text-[color:var(--muted)]">
+                    {subtitle}
+                  </div>
+                ) : null}
+              </div>
+
+              <Button variant="ghost" onClick={onClose} aria-label="Fechar">
+                <X className="h-4 w-4" />
+              </Button>
             </div>
-            {subtitle ? (
-              <div className="mt-1 text-sm font-semibold text-[color:var(--muted)]">{subtitle}</div>
+
+            {/* body com scroll interno (mantém o modal no meio) */}
+            <div className="max-h-[calc(100vh-220px)] overflow-y-auto px-5 py-4">
+              {children}
+            </div>
+
+            {/* footer */}
+            {footer ? (
+              <div className="border-t border-[color:var(--line)] bg-white/25 px-5 py-4">
+                {footer}
+              </div>
             ) : null}
-          </div>
-
-          <button
-            onClick={onClose}
-            className="icon-btn grid h-11 w-11 place-items-center"
-            aria-label="Fechar"
-          >
-            <X className="h-5 w-5 text-[color:var(--ink)]" strokeWidth={2.15} />
-          </button>
+          </GlassCard>
         </div>
-
-        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-5">{children}</div>
-
-        {footer ? (
-          <div className="border-t border-[color:var(--line)] bg-white/35 p-4 sm:p-5">{footer}</div>
-        ) : null}
-      </GlassCard>
-    </div>
+      </div>
+    </div>,
+    document.body
   );
 }

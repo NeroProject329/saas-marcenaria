@@ -831,380 +831,375 @@ export default function OrcamentosPage() {
 
       {/* MODAL ORÇAMENTO */}
       <Modal
-        open={open}
-        title={editingId ? "Editar orçamento" : "Novo orçamento"}
-        subtitle="POST /api/budgets • PATCH fallback /:id/full -> /:id"
-        onClose={() => setOpen(false)}
-        maxWidth="max-w-[1240px]"
-        footer={
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Badge tone="brand">Total: {moneyBRLFromCents(calc.totalCliente)}</Badge>
-              {showCardFee ? <Badge tone="wood">Taxa cartão: {moneyBRLFromCents(calc.cardFeeCents)}</Badge> : null}
-              {form.paymentMode === "AVISTA" ? <Badge tone="ink">Desconto ativo</Badge> : <Badge tone="neutral">Sem desconto</Badge>}
+  open={open}
+  title={editingId ? "Editar orçamento" : "Novo orçamento"}
+  subtitle="POST /api/budgets • PATCH fallback /:id/full -> /:id"
+  onClose={() => setOpen(false)}
+  maxWidth="max-w-[1240px]"
+  footer={
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div className="flex items-center gap-2">
+        <Badge tone="brand">Total: {moneyBRLFromCents(calc.totalCliente)}</Badge>
+        {showCardFee ? <Badge tone="wood">Taxa cartão: {moneyBRLFromCents(calc.cardFeeCents)}</Badge> : null}
+        {form.paymentMode === "AVISTA" ? <Badge tone="ink">Desconto ativo</Badge> : <Badge tone="neutral">Sem desconto</Badge>}
+      </div>
+      <div className="flex gap-2">
+        <Button variant="soft" onClick={() => setOpen(false)}>
+          Cancelar
+        </Button>
+        <Button variant="dark" onClick={saveBudget}>
+          Salvar
+        </Button>
+      </div>
+    </div>
+  }
+>
+  {/* ✅ impede o modal inteiro de ganhar scroll horizontal */}
+  <div className="min-w-0 overflow-x-hidden">
+    <div className="grid min-w-0 gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)]">
+      {/* LEFT */}
+      <div className="min-w-0 space-y-4">
+        <GlassCard className="p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Cliente</div>
+              <Select value={form.clientId} onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}>
+                <option value="">Selecione</option>
+                {clients.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.phone ? `• ${c.phone}` : ""}
+                  </option>
+                ))}
+              </Select>
             </div>
-            <div className="flex gap-2">
-              <Button variant="soft" onClick={() => setOpen(false)}>
-                Cancelar
-              </Button>
-              <Button variant="dark" onClick={saveBudget}>
-                Salvar
-              </Button>
+
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Entrega (data)</div>
+              <Input
+                type="date"
+                value={form.expectedDeliveryAt}
+                onChange={(e) => setForm((p) => ({ ...p, expectedDeliveryAt: e.target.value }))}
+              />
             </div>
-          </div>
-        }
-      >
-        <div className="grid gap-4 lg:grid-cols-[1.15fr_0.85fr]">
-          {/* LEFT */}
-          <div className="space-y-4">
-            <GlassCard className="p-4">
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="sm:col-span-2">
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Cliente</div>
-                  <Select value={form.clientId} onChange={(e) => setForm((p) => ({ ...p, clientId: e.target.value }))}>
-                    <option value="">Selecione</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name} {c.phone ? `• ${c.phone}` : ""}
-                      </option>
-                    ))}
-                  </Select>
-                </div>
 
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Entrega (data)</div>
-                  <Input
-                    type="date"
-                    value={form.expectedDeliveryAt}
-                    onChange={(e) => setForm((p) => ({ ...p, expectedDeliveryAt: e.target.value }))}
-                  />
-                </div>
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Dias de fabricação</div>
+              <Input
+                value={String(form.deliveryDays)}
+                onChange={(e) => setForm((p) => ({ ...p, deliveryDays: Math.max(0, Number(e.target.value || 0)) }))}
+              />
+            </div>
 
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Dias de fabricação</div>
-                  <Input
-                    value={String(form.deliveryDays)}
-                    onChange={(e) => setForm((p) => ({ ...p, deliveryDays: Math.max(0, Number(e.target.value || 0)) }))}
-                  />
-                </div>
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Custo do dia (R$)</div>
+              <Input value={form.dailyRate} onChange={(e) => setForm((p) => ({ ...p, dailyRate: e.target.value }))} />
+            </div>
 
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Custo do dia (R$)</div>
-                  <Input value={form.dailyRate} onChange={(e) => setForm((p) => ({ ...p, dailyRate: e.target.value }))} />
-                </div>
-
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Lucro (%)</div>
-                  <div className="relative">
-                    <Percent className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted)]" />
-                    <Input
-                      className="pl-10"
-                      value={String(form.profitPercent)}
-                      onChange={(e) => setForm((p) => ({ ...p, profitPercent: Math.max(0, Number(e.target.value || 0)) }))}
-                    />
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Observações</div>
-                  <textarea
-                    className="pill min-h-[90px] w-full px-3 py-2 text-sm font-semibold text-[color:var(--ink)] outline-none"
-                    value={form.notes}
-                    onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
-                    placeholder="Observações do orçamento…"
-                  />
-                </div>
-              </div>
-            </GlassCard>
-
-            {/* Pagamento + desconto */}
-            <GlassCard className="p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="font-display text-sm font-black text-[color:var(--ink)]">Pagamento</div>
-                  <div className="text-xs font-semibold text-[color:var(--muted)]">
-                    Desconto só à vista. Taxa cartão só parcelado + cartão.
-                  </div>
-                </div>
-                <Badge tone="wood">
-                  <CreditCard className="h-3.5 w-3.5" /> {form.paymentMode}
-                </Badge>
-              </div>
-
-              <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Modo</div>
-                  <Select
-                    value={form.paymentMode}
-                    onChange={(e) => {
-                      const v = e.target.value as PayMode;
-                      setForm((p) => ({
-                        ...p,
-                        paymentMode: v,
-                        // trava desconto quando parcelado
-                        ...(v === "PARCELADO"
-                          ? { discountType: "VALOR" as DiscountType, discount: "0,00", discountPreset: 0 }
-                          : {}),
-                      }));
-                    }}
-                  >
-                    <option value="AVISTA">À vista</option>
-                    <option value="PARCELADO">Parcelado</option>
-                  </Select>
-                </div>
-
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Método</div>
-                  <Select value={form.paymentMethod} onChange={(e) => setForm((p) => ({ ...p, paymentMethod: e.target.value }))}>
-                    <option value="">Selecione</option>
-                    <option value="PIX">PIX</option>
-                    <option value="DINHEIRO">DINHEIRO</option>
-                    <option value="CARTAO">CARTÃO</option>
-                    <option value="BOLETO">BOLETO</option>
-                  </Select>
-                </div>
-
-                {installmentsVisible ? (
-                  <div>
-                    <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Parcelas</div>
-                    <Input
-                      value={String(form.installmentsCount)}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, installmentsCount: clamp(Number(e.target.value || 2), 2, 24) }))
-                      }
-                    />
-                  </div>
-                ) : (
-                  <div className="sm:col-span-1 rounded-2xl border border-[color:var(--line)] bg-white/40 p-3 text-xs font-semibold text-[color:var(--muted)]">
-                    Desconto habilitado (à vista)
-                  </div>
-                )}
-
-                <div>
-                  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Tipo desconto</div>
-                  <Select
-                    value={form.discountType}
-                    disabled={!discountEnabled}
-                    onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as DiscountType }))}
-                  >
-                    <option value="VALOR">VALOR</option>
-                    <option value="PERCENT">PERCENT</option>
-                  </Select>
-                </div>
-
-                {form.discountType === "VALOR" ? (
-                  <div>
-                    <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Desconto (R$)</div>
-                    <Input
-                      value={form.discount}
-                      disabled={!discountEnabled}
-                      onChange={(e) => setForm((p) => ({ ...p, discount: e.target.value }))}
-                    />
-                  </div>
-                ) : (
-                  <div>
-                    <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Desconto (%)</div>
-                    <Select
-                      value={String(form.discountPreset)}
-                      disabled={!discountEnabled}
-                      onChange={(e) => setForm((p) => ({ ...p, discountPreset: Number(e.target.value || 0) }))}
-                    >
-                      <option value="0">0%</option>
-                      <option value="3">3%</option>
-                      <option value="5">5%</option>
-                      <option value="10">10%</option>
-                    </Select>
-                  </div>
-                )}
-              </div>
-            </GlassCard>
-
-            {/* Itens */}
-            <GlassCard className="p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <div className="font-display text-sm font-black text-[color:var(--ink)]">Itens</div>
-                  <div className="text-xs font-semibold text-[color:var(--muted)]">
-                    Valor unitário é calculado pelo motor (distribuição do total).
-                  </div>
-                </div>
-                <Button variant="soft" onClick={addItem}>
-                  <Plus className="h-4 w-4" /> Adicionar item
-                </Button>
-              </div>
-
-              <div className="mt-3 overflow-auto rounded-2xl border border-[color:var(--line)] bg-white/35">
-                <table className="min-w-[1150px] w-full text-sm">
-                  <thead className="bg-white/55">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Item</th>
-                      <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Descrição</th>
-                      <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Qtd</th>
-                      <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Valor (R$)</th>
-                      <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Materiais</th>
-                      <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">Custo</th>
-                      <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">Total</th>
-                      <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">Ação</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {items.map((it, idx) => {
-                      const alloc = calc.allocation[idx] || { unit: 0, total: 0 };
-
-                      const materialsCostPerUnit = (it.materials || []).reduce((acc, m) => {
-                        const qtt = Number(m.qty || 0);
-                        const unit = parseBRLToCents(m.unit);
-                        return acc + Math.max(0, qtt) * Math.max(0, unit);
-                      }, 0);
-
-                      const costTotalItem = Math.max(1, it.quantity || 1) * materialsCostPerUnit;
-
-                      return (
-                        <tr key={it.id} className="border-t border-[color:var(--line)]">
-                          <td className="px-4 py-3">
-                            <Input
-                              value={it.name}
-                              onChange={(e) =>
-                                setItems((p) => p.map((x) => (x.id === it.id ? { ...x, name: e.target.value } : x)))
-                              }
-                              placeholder="Ex: Armário planejado"
-                            />
-                          </td>
-                          <td className="px-4 py-3">
-                            <Input
-                              value={it.description}
-                              onChange={(e) =>
-                                setItems((p) => p.map((x) => (x.id === it.id ? { ...x, description: e.target.value } : x)))
-                              }
-                              placeholder="Detalhes (opcional)"
-                            />
-                          </td>
-                          <td className="px-4 py-3 w-[140px]">
-                            <Input
-                              value={String(it.quantity)}
-                              onChange={(e) =>
-                                setItems((p) =>
-                                  p.map((x) =>
-                                    x.id === it.id ? { ...x, quantity: clamp(Number(e.target.value || 1), 1, 9999) } : x
-                                  )
-                                )
-                              }
-                            />
-                          </td>
-                          <td className="px-4 py-3 w-[160px]">
-                            <Input value={String((alloc.unit / 100).toFixed(2)).replace(".", ",")} readOnly />
-                          </td>
-                          <td className="px-4 py-3 w-[170px]">
-                            <Button variant="ghost" onClick={() => openMaterials(it.id)}>
-                              <Boxes className="h-4 w-4" /> Materiais
-                            </Button>
-                          </td>
-                          <td className="px-4 py-3 text-right font-extrabold">{moneyBRLFromCents(costTotalItem)}</td>
-                          <td className="px-4 py-3 text-right font-extrabold">{moneyBRLFromCents(alloc.total)}</td>
-                          <td className="px-4 py-3 text-right">
-                            <Button variant="ghost" onClick={() => removeItem(it.id)} disabled={items.length <= 1}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </GlassCard>
-          </div>
-
-          {/* RIGHT (Resumo + breakdown premium) */}
-          <div className="space-y-4">
-            <GlassCard className="relative overflow-hidden p-4">
-              <div className="pointer-events-none absolute -top-10 -right-10 h-44 w-44 rounded-full bg-[rgba(247,211,32,0.18)] blur-3xl" />
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Lucro (%)</div>
               <div className="relative">
-                <div className="font-display text-sm font-black text-[color:var(--ink)]">Resumo do orçamento</div>
-
-                <div className="mt-3 space-y-2 text-sm font-semibold">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[color:var(--muted)]">Subtotal</span>
-                    <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.totalBeforeDiscount)}</span>
-                  </div>
-
-                  {showCardFee ? (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[color:var(--muted)]">Taxa cartão ({calc.cardFeePercent.toFixed(1)}%)</span>
-                      <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.cardFeeCents)}</span>
-                    </div>
-                  ) : null}
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[color:var(--muted)]">Desconto</span>
-                    <span className="font-extrabold text-[color:var(--ink)]">- {moneyBRLFromCents(calc.discountCents)}</span>
-                  </div>
-
-                  <div className="h-px bg-black/10" />
-
-                  <div className="flex items-center justify-between">
-                    <span className="text-[color:var(--muted)]">Total cliente</span>
-                    <span className="font-display text-xl font-black text-[color:var(--ink)]">{moneyBRLFromCents(calc.totalCliente)}</span>
-                  </div>
-
-                  {form.paymentMode === "PARCELADO" ? (
-                    <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
-                      <div className="text-xs font-extrabold text-[color:var(--muted)]">Parcelado</div>
-                      <div className="mt-1 font-extrabold text-[color:var(--ink)]">
-                        {clamp(Number(form.installmentsCount || 2), 2, 24)}x • {moneyBRLFromCents(Math.round(calc.totalCliente / clamp(Number(form.installmentsCount || 2), 2, 24)))}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">
-                        (no PDF aparece total + parcelas)
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
-                      <div className="text-xs font-extrabold text-[color:var(--muted)]">À vista</div>
-                      <div className="mt-1 font-extrabold text-[color:var(--ink)]">{form.paymentMethod || "—"}</div>
-                    </div>
-                  )}
-                </div>
+                <Percent className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[color:var(--muted)]" />
+                <Input
+                  className="pl-10"
+                  value={String(form.profitPercent)}
+                  onChange={(e) => setForm((p) => ({ ...p, profitPercent: Math.max(0, Number(e.target.value || 0)) }))}
+                />
               </div>
-            </GlassCard>
+            </div>
 
-            <GlassCard className="p-4">
-              <div className="font-display text-sm font-black text-[color:var(--ink)]">Custos & margem</div>
-
-              <div className="mt-3 space-y-2 text-sm font-semibold">
-                <div className="flex items-center justify-between">
-                  <span className="text-[color:var(--muted)]">Custo materiais</span>
-                  <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.costItems)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[color:var(--muted)]">Custo fabricação</span>
-                  <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.laborCents)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[color:var(--muted)]">Custo projeto</span>
-                  <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.projectCost)}</span>
-                </div>
-
-                <div className="h-px bg-black/10" />
-
-                <div className="flex items-center justify-between">
-                  <span className="text-[color:var(--muted)]">Lucro</span>
-                  <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.profit)}</span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-[color:var(--muted)]">Margem</span>
-                  <span className="font-extrabold text-[color:var(--ink)]">{calc.margin.toFixed(1)}%</span>
-                </div>
-
-                <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3 text-xs font-semibold text-[color:var(--muted)]">
-                  <div className="flex items-center gap-2">
-                    <Hammer className="h-4 w-4" /> Motor idêntico ao legado (M5): materiais + custo do dia + lucro + taxa cartão + desconto à vista.
-                  </div>
-                </div>
-              </div>
-            </GlassCard>
+            <div className="sm:col-span-2">
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Observações</div>
+              <textarea
+                className="pill min-h-[90px] w-full px-3 py-2 text-sm font-semibold text-[color:var(--ink)] outline-none"
+                value={form.notes}
+                onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                placeholder="Observações do orçamento…"
+              />
+            </div>
           </div>
-        </div>
-      </Modal>
+        </GlassCard>
+
+        {/* Pagamento + desconto */}
+        <GlassCard className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-display text-sm font-black text-[color:var(--ink)]">Pagamento</div>
+              <div className="text-xs font-semibold text-[color:var(--muted)]">
+                Desconto só à vista. Taxa cartão só parcelado + cartão.
+              </div>
+            </div>
+            <Badge tone="wood">
+              <CreditCard className="h-3.5 w-3.5" /> {form.paymentMode}
+            </Badge>
+          </div>
+
+          <div className="mt-3 grid gap-3 sm:grid-cols-2">
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Modo</div>
+              <Select
+                value={form.paymentMode}
+                onChange={(e) => {
+                  const v = e.target.value as PayMode;
+                  setForm((p) => ({
+                    ...p,
+                    paymentMode: v,
+                    ...(v === "PARCELADO"
+                      ? { discountType: "VALOR" as DiscountType, discount: "0,00", discountPreset: 0 }
+                      : {}),
+                  }));
+                }}
+              >
+                <option value="AVISTA">À vista</option>
+                <option value="PARCELADO">Parcelado</option>
+              </Select>
+            </div>
+
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Método</div>
+              <Select value={form.paymentMethod} onChange={(e) => setForm((p) => ({ ...p, paymentMethod: e.target.value }))}>
+                <option value="">Selecione</option>
+                <option value="PIX">PIX</option>
+                <option value="DINHEIRO">DINHEIRO</option>
+                <option value="CARTAO">CARTÃO</option>
+                <option value="BOLETO">BOLETO</option>
+              </Select>
+            </div>
+
+            {installmentsVisible ? (
+              <div>
+                <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Parcelas</div>
+                <Input
+                  value={String(form.installmentsCount)}
+                  onChange={(e) => setForm((p) => ({ ...p, installmentsCount: clamp(Number(e.target.value || 2), 2, 24) }))}
+                />
+              </div>
+            ) : (
+              <div className="sm:col-span-1 rounded-2xl border border-[color:var(--line)] bg-white/40 p-3 text-xs font-semibold text-[color:var(--muted)]">
+                Desconto habilitado (à vista)
+              </div>
+            )}
+
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Tipo desconto</div>
+              <Select
+                value={form.discountType}
+                disabled={!discountEnabled}
+                onChange={(e) => setForm((p) => ({ ...p, discountType: e.target.value as DiscountType }))}
+              >
+                <option value="VALOR">VALOR</option>
+                <option value="PERCENT">PERCENT</option>
+              </Select>
+            </div>
+
+            {form.discountType === "VALOR" ? (
+              <div>
+                <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Desconto (R$)</div>
+                <Input value={form.discount} disabled={!discountEnabled} onChange={(e) => setForm((p) => ({ ...p, discount: e.target.value }))} />
+              </div>
+            ) : (
+              <div>
+                <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Desconto (%)</div>
+                <Select
+                  value={String(form.discountPreset)}
+                  disabled={!discountEnabled}
+                  onChange={(e) => setForm((p) => ({ ...p, discountPreset: Number(e.target.value || 0) }))}
+                >
+                  <option value="0">0%</option>
+                  <option value="3">3%</option>
+                  <option value="5">5%</option>
+                  <option value="10">10%</option>
+                </Select>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+
+        {/* Itens */}
+        <GlassCard className="p-4">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="font-display text-sm font-black text-[color:var(--ink)]">Itens</div>
+              <div className="text-xs font-semibold text-[color:var(--muted)]">
+                Valor unitário é calculado pelo motor (distribuição do total).
+              </div>
+            </div>
+            <Button variant="soft" onClick={addItem}>
+              <Plus className="h-4 w-4" /> Adicionar item
+            </Button>
+          </div>
+
+          {/* ✅ scroll só aqui */}
+          <div className="mt-3 min-w-0 overflow-x-auto rounded-2xl border border-[color:var(--line)] bg-white/35">
+            <table className="w-full min-w-[1150px] table-fixed text-sm">
+              <colgroup>{["w-[220px]","w-[260px]","w-[90px]","w-[130px]","w-[140px]","w-[120px]","w-[120px]","w-[80px]"].map((c,i)=>(<col key={i} className={c} />))}</colgroup>
+              <thead className="bg-white/55">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Item</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Descrição</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Qtd</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Valor (R$)</th>
+                  <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Materiais</th>
+                  <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">Custo</th>
+                  <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">Total</th>
+                  <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">Ação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((it, idx) => {
+                  const alloc = calc.allocation[idx] || { unit: 0, total: 0 };
+
+                  const materialsCostPerUnit = (it.materials || []).reduce((acc, m) => {
+                    const qtt = Number(m.qty || 0);
+                    const unit = parseBRLToCents(m.unit);
+                    return acc + Math.max(0, qtt) * Math.max(0, unit);
+                  }, 0);
+
+                  const costTotalItem = Math.max(1, it.quantity || 1) * materialsCostPerUnit;
+
+                  return (
+                    <tr key={it.id} className="border-t border-[color:var(--line)]">
+                      <td className="px-4 py-3">
+                        <Input
+                          value={it.name}
+                          onChange={(e) => setItems((p) => p.map((x) => (x.id === it.id ? { ...x, name: e.target.value } : x)))}
+                          placeholder="Ex: Armário planejado"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Input
+                          value={it.description}
+                          onChange={(e) => setItems((p) => p.map((x) => (x.id === it.id ? { ...x, description: e.target.value } : x)))}
+                          placeholder="Detalhes (opcional)"
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Input
+                          value={String(it.quantity)}
+                          onChange={(e) =>
+                            setItems((p) =>
+                              p.map((x) => (x.id === it.id ? { ...x, quantity: clamp(Number(e.target.value || 1), 1, 9999) } : x))
+                            )
+                          }
+                        />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Input value={String((alloc.unit / 100).toFixed(2)).replace(".", ",")} readOnly />
+                      </td>
+                      <td className="px-4 py-3">
+                        <Button variant="ghost" onClick={() => openMaterials(it.id)}>
+                          <Boxes className="h-4 w-4" /> Materiais
+                        </Button>
+                      </td>
+                      <td className="px-4 py-3 text-right font-extrabold">{moneyBRLFromCents(costTotalItem)}</td>
+                      <td className="px-4 py-3 text-right font-extrabold">{moneyBRLFromCents(alloc.total)}</td>
+                      <td className="px-4 py-3 text-right">
+                        <Button variant="ghost" onClick={() => removeItem(it.id)} disabled={items.length <= 1}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </GlassCard>
+      </div>
+
+      {/* RIGHT */}
+      <div className="min-w-0 space-y-4">
+        <GlassCard className="relative overflow-hidden p-4">
+          <div className="pointer-events-none absolute -top-10 -right-10 h-44 w-44 rounded-full bg-[rgba(247,211,32,0.18)] blur-3xl" />
+          <div className="relative">
+            <div className="font-display text-sm font-black text-[color:var(--ink)]">Resumo do orçamento</div>
+
+            <div className="mt-3 space-y-2 text-sm font-semibold">
+              <div className="flex items-center justify-between">
+                <span className="text-[color:var(--muted)]">Subtotal</span>
+                <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.totalBeforeDiscount)}</span>
+              </div>
+
+              {showCardFee ? (
+                <div className="flex items-center justify-between">
+                  <span className="text-[color:var(--muted)]">Taxa cartão ({calc.cardFeePercent.toFixed(1)}%)</span>
+                  <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.cardFeeCents)}</span>
+                </div>
+              ) : null}
+
+              <div className="flex items-center justify-between">
+                <span className="text-[color:var(--muted)]">Desconto</span>
+                <span className="font-extrabold text-[color:var(--ink)]">- {moneyBRLFromCents(calc.discountCents)}</span>
+              </div>
+
+              <div className="h-px bg-black/10" />
+
+              <div className="flex items-center justify-between">
+                <span className="text-[color:var(--muted)]">Total cliente</span>
+                <span className="font-display text-xl font-black text-[color:var(--ink)]">{moneyBRLFromCents(calc.totalCliente)}</span>
+              </div>
+
+              {form.paymentMode === "PARCELADO" ? (
+                <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
+                  <div className="text-xs font-extrabold text-[color:var(--muted)]">Parcelado</div>
+                  <div className="mt-1 font-extrabold text-[color:var(--ink)]">
+                    {clamp(Number(form.installmentsCount || 2), 2, 24)}x •{" "}
+                    {moneyBRLFromCents(
+                      Math.round(
+                        calc.totalCliente / clamp(Number(form.installmentsCount || 2), 2, 24)
+                      )
+                    )}
+                  </div>
+                  <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">(no PDF aparece total + parcelas)</div>
+                </div>
+              ) : (
+                <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
+                  <div className="text-xs font-extrabold text-[color:var(--muted)]">À vista</div>
+                  <div className="mt-1 font-extrabold text-[color:var(--ink)]">{form.paymentMethod || "—"}</div>
+                </div>
+              )}
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard className="p-4">
+          <div className="font-display text-sm font-black text-[color:var(--ink)]">Custos & margem</div>
+
+          <div className="mt-3 space-y-2 text-sm font-semibold">
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--muted)]">Custo materiais</span>
+              <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.costItems)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--muted)]">Custo fabricação</span>
+              <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.laborCents)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--muted)]">Custo projeto</span>
+              <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.projectCost)}</span>
+            </div>
+
+            <div className="h-px bg-black/10" />
+
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--muted)]">Lucro</span>
+              <span className="font-extrabold text-[color:var(--ink)]">{moneyBRLFromCents(calc.profit)}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-[color:var(--muted)]">Margem</span>
+              <span className="font-extrabold text-[color:var(--ink)]">{calc.margin.toFixed(1)}%</span>
+            </div>
+
+            <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3 text-xs font-semibold text-[color:var(--muted)]">
+              <div className="flex items-center gap-2">
+                <Hammer className="h-4 w-4" /> Motor idêntico ao legado (M5): materiais + custo do dia + lucro + taxa cartão + desconto à vista.
+              </div>
+            </div>
+          </div>
+        </GlassCard>
+      </div>
+    </div>
+  </div>
+</Modal>
 
       {/* MODAL MATERIAIS */}
       <Modal
@@ -1241,8 +1236,9 @@ export default function OrcamentosPage() {
             </Button>
           </div>
 
-          <div className="mt-3 overflow-auto rounded-2xl border border-[color:var(--line)] bg-white/35">
-            <table className="min-w-[980px] w-full text-sm">
+          <div className="mt-3 overflow-x-auto lg:overflow-x-hidden rounded-2xl border border-[color:var(--line)] bg-white/35">
+          <table className="w-full min-w-0 table-fixed text-sm">
+            <colgroup><col /><col className="w-[140px]" /><col className="w-[180px]" /><col className="w-[140px]" /><col className="w-[80px]" /></colgroup>
               <thead className="bg-white/55">
                 <tr>
                   <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Material</th>

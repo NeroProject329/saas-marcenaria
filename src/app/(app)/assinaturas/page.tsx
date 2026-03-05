@@ -1,5 +1,10 @@
+import { Suspense } from "react";
 import AssinaturasClient from "./AssinaturasClient";
 
 export default function AssinaturasPage() {
-  return <AssinaturasClient />;
+  return (
+    <Suspense fallback={null}>
+      <AssinaturasClient />
+    </Suspense>
+  );
 }

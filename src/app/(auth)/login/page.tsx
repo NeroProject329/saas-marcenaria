@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GlassCard from "@/components/ui/GlassCard";
 import Input from "@/components/ui/Input";
@@ -8,15 +8,17 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { useAuth } from "@/auth/AuthProvider";
 
-export default function LoginPage() {
+function LoginInner() {
   const { status, login } = useAuth();
   const router = useRouter();
   const sp = useSearchParams();
+
+  // ✅ useSearchParams precisa estar abaixo de um <Suspense>
   const next = useMemo(() => {
-  const raw = sp.get("next") || "/dashboard";
-  if (raw.startsWith("/login") || raw.startsWith("/register")) return "/dashboard";
-  return raw;
-}, [sp]);
+    const raw = sp.get("next") || "/dashboard";
+    if (raw.startsWith("/login") || raw.startsWith("/register")) return "/dashboard";
+    return raw;
+  }, [sp]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -89,5 +91,13 @@ export default function LoginPage() {
         </Button>
       </form>
     </GlassCard>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="h-10" />}>
+      <LoginInner />
+    </Suspense>
   );
 }

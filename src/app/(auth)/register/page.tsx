@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import GlassCard from "@/components/ui/GlassCard";
 import Input from "@/components/ui/Input";
@@ -8,15 +8,16 @@ import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
 import { useAuth } from "@/auth/AuthProvider";
 
-export default function RegisterPage() {
+function RegisterInner() {
   const { status, register } = useAuth();
   const router = useRouter();
   const sp = useSearchParams();
+
   const next = useMemo(() => {
-  const raw = sp.get("next") || "/dashboard";
-  if (raw.startsWith("/login") || raw.startsWith("/register")) return "/dashboard";
-  return raw;
-}, [sp]);
+    const raw = sp.get("next") || "/dashboard";
+    if (raw.startsWith("/login") || raw.startsWith("/register")) return "/dashboard";
+    return raw;
+  }, [sp]);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -93,10 +94,23 @@ export default function RegisterPage() {
           {pending ? "Criando..." : "Criar conta"}
         </Button>
 
-        <Button type="button" className="w-full" variant="soft" onClick={() => router.push(`/login?next=${encodeURIComponent(next)}`)}>
+        <Button
+          type="button"
+          className="w-full"
+          variant="soft"
+          onClick={() => router.push(`/login?next=${encodeURIComponent(next)}`)}
+        >
           Já tenho conta
         </Button>
       </form>
     </GlassCard>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="h-10" />}>
+      <RegisterInner />
+    </Suspense>
   );
 }

@@ -26,7 +26,13 @@ import { useGsapStagger } from "@/motion/useGsapStagger";
 import { moneyBRLFromCents, isoToBR } from "@/lib/format";
 import WaveMiniCard from "@/components/charts/WaveMiniCard";
 
-import { getDashboardOverview, getDashboardPlus, getDre, getDfc, getProjections } from "@/services/dashboardPlus.service";
+import {
+  getDashboardOverview,
+  getDashboardPlus,
+  getDre,
+  getDfc,
+  getProjections,
+} from "@/services/dashboardPlus.service";
 
 type Section = "overview" | "finance" | "sales" | "stock";
 type FinanceTab =
@@ -127,7 +133,6 @@ export default function DashboardClient() {
   }
 
   useEffect(() => {
-    // carrega já no início (não pesa muito; tem cache)
     loadDashCore();
     loadDre();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -201,6 +206,53 @@ export default function DashboardClient() {
     }));
   }, [plusData]);
 
+  // ✅ NOVO: Semana (Pagamentos/Recebimentos) + Preview entregas
+  const weekWindow = useMemo(() => {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setDate(end.getDate() + 7);
+    end.setHours(23, 59, 59, 999);
+    return { start, end };
+  }, []);
+
+  const weekReceivables = useMemo(() => {
+    const { start, end } = weekWindow;
+    return (recvRows || [])
+      .filter((r: any) => {
+        if (!r?.dueDate) return false;
+        const d = new Date(r.dueDate);
+        return !Number.isNaN(d.getTime()) && d >= start && d <= end;
+      })
+      .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [recvRows, weekWindow]);
+
+  const weekPayables = useMemo(() => {
+    const { start, end } = weekWindow;
+    return (payRows || [])
+      .filter((r: any) => {
+        if (!r?.dueDate) return false;
+        const d = new Date(r.dueDate);
+        return !Number.isNaN(d.getTime()) && d >= start && d <= end;
+      })
+      .sort((a: any, b: any) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [payRows, weekWindow]);
+
+  const weekReceivablesTotalCents = useMemo(
+    () => weekReceivables.reduce((acc: number, r: any) => acc + (Number(r.amountCents) || 0), 0),
+    [weekReceivables]
+  );
+
+  const weekPayablesTotalCents = useMemo(
+    () => weekPayables.reduce((acc: number, r: any) => acc + (Number(r.amountCents) || 0), 0),
+    [weekPayables]
+  );
+
+  const deliveriesPreview = useMemo(() => {
+    const list = overviewData?.upcomingDeliveries || [];
+    return (Array.isArray(list) ? list : []).slice(0, 3);
+  }, [overviewData]);
+
   // ====== gráfico (usa série do PLUS quando existir; senão placeholder) ======
   const chartPoints = useMemo(() => {
     const labels: string[] = (plusData?.series?.labels || []).map((x: any) => String(x).slice(5)); // MM
@@ -209,7 +261,6 @@ export default function DashboardClient() {
       return labels.map((lab, i) => ({ label: lab, valueCents: revenue[i] || 0 }));
     }
 
-    // fallback placeholder
     return [
       { label: "Jan", valueCents: 2100000 },
       { label: "Fev", valueCents: 2400000 },
@@ -239,14 +290,32 @@ export default function DashboardClient() {
   }, [dreData]);
 
   const dfcSeries = useMemo(
-  () => (Array.isArray(dfcData?.real?.series) ? dfcData.real.series : []),
-  [dfcData]
-);
+    () => (Array.isArray(dfcData?.real?.series) ? dfcData.real.series : []),
+    [dfcData]
+  );
 
-const dfcProjectedSeries = useMemo(
-  () => (Array.isArray(dfcData?.projected?.series) ? dfcData.projected.series : []),
-  [dfcData]
-);
+  const dfcProjectedSeries = useMemo(
+    () => (Array.isArray(dfcData?.projected?.series) ? dfcData.projected.series : []),
+    [dfcData]
+  );
+
+  // ✅ NOVO: Resumo para os 4 cards do Financeiro
+  const dfcTotals = useMemo(() => {
+    const s = Array.isArray(dfcSeries) ? dfcSeries : [];
+    const inCents = s.reduce((acc: number, r: any) => acc + (Number(r.inCents) || 0), 0);
+    const outCents = s.reduce((acc: number, r: any) => acc + (Number(r.outCents) || 0), 0);
+    return { inCents, outCents, netCents: inCents - outCents };
+  }, [dfcSeries]);
+
+  const dreOperatingCents = useMemo(
+    () => Number(dreData?.dre?.operatingProfitCents || 0) || 0,
+    [dreData]
+  );
+
+  const projectedFinalCents = useMemo(() => {
+    const v = dfcData?.projected?.finalBalanceCents ?? dfcData?.projected?.finalCents;
+    return Number(v || 0) || 0;
+  }, [dfcData]);
 
   const projItems = useMemo(() => {
     const items = projData?.items || [];
@@ -372,6 +441,7 @@ const dfcProjectedSeries = useMemo(
       {section === "overview" ? (
         <section className="grid gap-3 lg:grid-cols-[1.2fr_0.8fr]" data-stagger>
           <div className="grid gap-3">
+            {/* ✅ AJUSTADO: Próximas entregas (agora renderiza dados reais) */}
             <GlassCard className="p-4">
               <div className="flex items-center justify-between gap-2">
                 <div>
@@ -379,22 +449,54 @@ const dfcProjectedSeries = useMemo(
                     Próximas entregas
                   </div>
                   <div className="text-xs font-semibold text-[color:var(--muted)]">
-                    Vai puxar pedidos em andamento (Operacional)
+                    Puxando pedidos em andamento (Operacional)
                   </div>
                 </div>
-                <Badge tone="brand">Em breve</Badge>
+
+                {dashLoading ? (
+                  <Badge tone="brand">Carregando</Badge>
+                ) : deliveriesPreview.length ? (
+                  <Badge tone="wood">{deliveriesPreview.length} itens</Badge>
+                ) : (
+                  <Badge tone="ink">Sem itens</Badge>
+                )}
               </div>
 
               <div className="mt-4 space-y-2">
-                {Array.from({ length: 3 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-black/5 p-3"
-                  >
-                    <Skeleton className="h-4 w-[68%]" />
-                    <Skeleton className="h-4 w-20" />
+                {dashLoading ? (
+                  Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-black/5 p-3"
+                    >
+                      <Skeleton className="h-4 w-[68%]" />
+                      <Skeleton className="h-4 w-20" />
+                    </div>
+                  ))
+                ) : deliveriesPreview.length ? (
+                  deliveriesPreview.map((r: any, i: number) => (
+                    <div
+                      key={r.id || `d_${i}`}
+                      className="grid grid-cols-[1fr_auto] gap-3 rounded-2xl bg-black/5 p-3"
+                    >
+                      <div className="min-w-0">
+                        <div className="truncate text-sm font-extrabold text-[color:var(--ink)]">
+                          {String(r.id || "").slice(-6).toUpperCase()} • {r.client?.name || "-"}
+                        </div>
+                        <div className="mt-0.5 text-xs font-semibold text-[color:var(--muted)]">
+                          Entrega {isoToBR(r.expectedDeliveryAt)}
+                        </div>
+                      </div>
+                      <div className="flex items-center">
+                        <StatusPill tone="neutral" label={String(r.status || "-")} />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl bg-black/5 p-3 text-xs font-semibold text-[color:var(--muted)]">
+                    Sem entregas previstas para os próximos dias.
                   </div>
-                ))}
+                )}
               </div>
             </GlassCard>
 
@@ -406,22 +508,89 @@ const dfcProjectedSeries = useMemo(
             />
           </div>
 
+          {/* ✅ AJUSTADO: Semana (pagamentos/recebimentos) */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
             <GlassCard className="p-4">
-              <div className="font-display text-sm font-black text-[color:var(--ink)]">
-                Pagamentos da semana
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-display text-sm font-black text-[color:var(--ink)]">
+                  Pagamentos da semana
+                </div>
+                <div className="text-sm font-black text-[color:var(--ink)]">
+                  {dashLoading ? "—" : moneyBRLFromCents(weekPayablesTotalCents)}
+                </div>
               </div>
+
               <div className="mt-3 rounded-2xl bg-black/5 p-3">
-                <Skeleton className="h-24 w-full" />
+                {dashLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : weekPayables.length ? (
+                  <div className="space-y-2">
+                    {weekPayables.slice(0, 4).map((r: any) => (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl bg-black/5 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-extrabold text-[color:var(--ink)]">
+                            {r.supplier || r.desc || "Pagamento"}
+                          </div>
+                          <div className="text-[11px] font-semibold text-[color:var(--muted)]">
+                            {isoToBR(r.dueDate)}
+                          </div>
+                        </div>
+                        <div className="text-xs font-extrabold text-[color:var(--ink)]">
+                          {moneyBRLFromCents(r.amountCents || 0)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs font-semibold text-[color:var(--muted)]">
+                    Nenhum pagamento previsto para os próximos 7 dias.
+                  </div>
+                )}
               </div>
             </GlassCard>
 
             <GlassCard className="p-4">
-              <div className="font-display text-sm font-black text-[color:var(--ink)]">
-                Recebimentos da semana
+              <div className="flex items-center justify-between gap-2">
+                <div className="font-display text-sm font-black text-[color:var(--ink)]">
+                  Recebimentos da semana
+                </div>
+                <div className="text-sm font-black text-[color:var(--ink)]">
+                  {dashLoading ? "—" : moneyBRLFromCents(weekReceivablesTotalCents)}
+                </div>
               </div>
+
               <div className="mt-3 rounded-2xl bg-black/5 p-3">
-                <Skeleton className="h-24 w-full" />
+                {dashLoading ? (
+                  <Skeleton className="h-24 w-full" />
+                ) : weekReceivables.length ? (
+                  <div className="space-y-2">
+                    {weekReceivables.slice(0, 4).map((r: any) => (
+                      <div
+                        key={r.id}
+                        className="flex items-center justify-between gap-3 rounded-2xl bg-black/5 px-3 py-2"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate text-xs font-extrabold text-[color:var(--ink)]">
+                            {r.client || r.desc || "Recebimento"}
+                          </div>
+                          <div className="text-[11px] font-semibold text-[color:var(--muted)]">
+                            {isoToBR(r.dueDate)}
+                          </div>
+                        </div>
+                        <div className="text-xs font-extrabold text-[color:var(--ink)]">
+                          {moneyBRLFromCents(r.amountCents || 0)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-xs font-semibold text-[color:var(--muted)]">
+                    Nenhum recebimento previsto para os próximos 7 dias.
+                  </div>
+                )}
               </div>
             </GlassCard>
           </div>
@@ -430,67 +599,105 @@ const dfcProjectedSeries = useMemo(
 
       {section === "finance" ? (
         <section className="space-y-3" data-stagger>
-          <Tabs items={financeTabs} value={financeTab} onChange={(k) => setFinanceTab(k as FinanceTab)} />
+          <Tabs
+            items={financeTabs}
+            value={financeTab}
+            onChange={(k) => setFinanceTab(k as FinanceTab)}
+          />
 
           {financeTab === "receber" ? (
             <DataTable
-  title="Recebíveis"
-  subtitle="..."
-  rows={recvRows}
-  rowKey={(r: any) => r.id}
-  columns={[
-    { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
-    { header: "Cliente", cell: (r: any) => r.client },
-    { header: "Descrição", cell: (r: any) => r.desc },
-    { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
-    {
-      header: "Status",
-      cell: (r: any) =>
-        String(r.status).toUpperCase() === "PAGO" ? (
-          <StatusPill tone="success" label="Pago" />
-        ) : (
-          <StatusPill tone="warning" label="Aberto" />
-        ),
-    },
-  ]}
-/>
+              title="Recebíveis"
+              subtitle="..."
+              rows={recvRows}
+              rowKey={(r: any) => r.id}
+              columns={[
+                { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
+                { header: "Cliente", cell: (r: any) => r.client },
+                { header: "Descrição", cell: (r: any) => r.desc },
+                {
+                  header: "Valor",
+                  className: "text-right font-extrabold",
+                  cell: (r: any) => moneyBRLFromCents(r.amountCents),
+                },
+                {
+                  header: "Status",
+                  cell: (r: any) =>
+                    String(r.status).toUpperCase() === "PAGO" ? (
+                      <StatusPill tone="success" label="Pago" />
+                    ) : (
+                      <StatusPill tone="warning" label="Aberto" />
+                    ),
+                },
+              ]}
+            />
           ) : financeTab === "pagar" ? (
-           <DataTable
-  title="Recebíveis"
-  subtitle="..."
-  rows={recvRows}
-  rowKey={(r: any) => r.id}
-  columns={[
-    { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
-    { header: "Cliente", cell: (r: any) => r.client },
-    { header: "Descrição", cell: (r: any) => r.desc },
-    { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
-    {
-      header: "Status",
-      cell: (r: any) =>
-        String(r.status).toUpperCase() === "PAGO" ? (
-          <StatusPill tone="success" label="Pago" />
-        ) : (
-          <StatusPill tone="warning" label="Aberto" />
-        ),
-    },
-  ]}
-/>
+            // ✅ AJUSTADO: aba pagar usa payRows e texto correto
+            <DataTable
+              title="Pagáveis"
+              subtitle="..."
+              rows={payRows}
+              rowKey={(r: any) => r.id}
+              columns={[
+                { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
+                { header: "Fornecedor", cell: (r: any) => r.supplier },
+                { header: "Descrição", cell: (r: any) => r.desc },
+                {
+                  header: "Valor",
+                  className: "text-right font-extrabold",
+                  cell: (r: any) => moneyBRLFromCents(r.amountCents),
+                },
+                {
+                  header: "Status",
+                  cell: (r: any) =>
+                    String(r.status).toUpperCase() === "PAGO" ? (
+                      <StatusPill tone="success" label="Pago" />
+                    ) : (
+                      <StatusPill tone="warning" label="Aberto" />
+                    ),
+                },
+              ]}
+            />
           ) : (
             <GlassCard className="p-5">
               <div className="font-display text-sm font-black text-[color:var(--ink)]">
                 {financeTabs.find((t) => t.key === financeTab)?.label}
               </div>
               <div className="mt-2 text-sm font-semibold text-[color:var(--muted)]">
-                Agora já está ligado no backend. Se algum bloco vier vazio, é porque não há dados no período.
+                Agora já está ligado no backend. Se algum bloco vier vazio, é porque não há dados no
+                período.
               </div>
 
-              {/* mantém seu conjunto de cards */}
+              {/* ✅ AJUSTADO: cards agora puxam números reais */}
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <KpiCard label="Entradas" value="—" icon={ArrowUpCircle} hint="via DFC/DRE" tone="success" />
-                <KpiCard label="Saídas" value="—" icon={ArrowDownCircle} hint="via DFC/DRE" tone="danger" />
-                <KpiCard label="Relatório DRE" value="—" icon={FileText} hint="aba DRE" tone="brand" />
-                <KpiCard label="Fluxo projetado" value="—" icon={TrendingUp} hint="aba Fluxo projetado" tone="neutral" />
+                <KpiCard
+                  label="Entradas"
+                  value={moneyBRLFromCents(dfcTotals.inCents)}
+                  icon={ArrowUpCircle}
+                  hint={`Total do mês (DFC real) • ${endMonth}`}
+                  tone="success"
+                />
+                <KpiCard
+                  label="Saídas"
+                  value={moneyBRLFromCents(dfcTotals.outCents)}
+                  icon={ArrowDownCircle}
+                  hint={`Total do mês (DFC real) • ${endMonth}`}
+                  tone="danger"
+                />
+                <KpiCard
+                  label="Relatório DRE"
+                  value={moneyBRLFromCents(dreOperatingCents)}
+                  icon={FileText}
+                  hint={`Lucro operacional (DRE) • ${endMonth}`}
+                  tone="brand"
+                />
+                <KpiCard
+                  label="Fluxo projetado"
+                  value={moneyBRLFromCents(projectedFinalCents)}
+                  icon={TrendingUp}
+                  hint={`Saldo final projetado (DFC) • ${endMonth}`}
+                  tone="neutral"
+                />
               </div>
 
               {/* ✅ conteúdo real por aba (add-on) */}
@@ -503,9 +710,21 @@ const dfcProjectedSeries = useMemo(
                     rowKey={(r: any, i: number) => r.month || `m_${i}`}
                     columns={[
                       { header: "Mês", cell: (r: any) => r.month },
-                      { header: "Entradas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.expectedInCents || 0) },
-                      { header: "Saídas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.expectedOutCents || 0) },
-                      { header: "Saldo", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.netCents || 0) },
+                      {
+                        header: "Entradas",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.expectedInCents || 0),
+                      },
+                      {
+                        header: "Saídas",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.expectedOutCents || 0),
+                      },
+                      {
+                        header: "Saldo",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.netCents || 0),
+                      },
                     ]}
                   />
                 </div>
@@ -520,9 +739,21 @@ const dfcProjectedSeries = useMemo(
                     rowKey={(r: any, i: number) => r.day || `d_${i}`}
                     columns={[
                       { header: "Dia", cell: (r: any) => String(r.day).slice(8) },
-                      { header: "Entradas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.inCents || 0) },
-                      { header: "Saídas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.outCents || 0) },
-                      { header: "Saldo", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.netCents || 0) },
+                      {
+                        header: "Entradas",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.inCents || 0),
+                      },
+                      {
+                        header: "Saídas",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.outCents || 0),
+                      },
+                      {
+                        header: "Saldo",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.netCents || 0),
+                      },
                     ]}
                   />
                 </div>
@@ -537,7 +768,11 @@ const dfcProjectedSeries = useMemo(
                     rowKey={(r: any, i: number) => `${r.k}_${i}`}
                     columns={[
                       { header: "Linha", cell: (r: any) => r.k },
-                      { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => r.v },
+                      {
+                        header: "Valor",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => r.v,
+                      },
                     ]}
                   />
                 </div>
@@ -552,9 +787,21 @@ const dfcProjectedSeries = useMemo(
                     rowKey={(r: any, i: number) => r.day || `p_${i}`}
                     columns={[
                       { header: "Dia", cell: (r: any) => String(r.day).slice(8) },
-                      { header: "Entradas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.inCents || 0) },
-                      { header: "Saídas", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.outCents || 0) },
-                      { header: "Saldo", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.netCents || 0) },
+                      {
+                        header: "Entradas",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.inCents || 0),
+                      },
+                      {
+                        header: "Saídas",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.outCents || 0),
+                      },
+                      {
+                        header: "Saldo",
+                        className: "text-right font-extrabold",
+                        cell: (r: any) => moneyBRLFromCents(r.netCents || 0),
+                      },
                     ]}
                   />
                 </div>
@@ -568,11 +815,19 @@ const dfcProjectedSeries = useMemo(
                     rows={overviewData?.upcomingDeliveries || []}
                     rowKey={(r: any, i: number) => r.id || `o_${i}`}
                     columns={[
-                      { header: "Código", cell: (r: any) => String(r.id || "").slice(-6).toUpperCase() },
+                      {
+                        header: "Código",
+                        cell: (r: any) => String(r.id || "").slice(-6).toUpperCase(),
+                      },
                       { header: "Cliente", cell: (r: any) => r.client?.name || "-" },
                       { header: "Criado", cell: (r: any) => isoToBR(r.createdAt) },
                       { header: "Entrega", cell: (r: any) => isoToBR(r.expectedDeliveryAt) },
-                      { header: "Status", cell: (r: any) => <StatusPill tone="neutral" label={String(r.status || "-")} /> },
+                      {
+                        header: "Status",
+                        cell: (r: any) => (
+                          <StatusPill tone="neutral" label={String(r.status || "-")} />
+                        ),
+                      },
                     ]}
                   />
                 </div>

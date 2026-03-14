@@ -10,16 +10,41 @@ import Button from "@/components/ui/Button";
 import Tabs from "@/components/ui/Tabs";
 import Select from "@/components/ui/Select";
 import DataTable from "@/components/ui/DataTable";
+import StatusPill from "@/components/ui/StatusPill";
 
 import { useGsapStagger } from "@/motion/useGsapStagger";
 import { moneyBRLFromCents, isoToBR } from "@/lib/format";
+import { financeStatusLabel, financeStatusTone, orderStatusLabel, orderStatusTone, reportBasisLabel } from "@/lib/status";
 import { getReportPack, downloadReportPackPdf } from "@/services/reports.service";
+import { listOrders } from "@/services/orders.service";
+import type { Order } from "@/lib/types";
 
-type Tab = "summary" | "cash" | "overdue" | "tx";
+type Tab = "summary" | "cash" | "overdue" | "tx" | "sales";
 
 function monthNow() {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function isInMonth(iso: string | null | undefined, month: string) {
+  if (!iso || !month) return false;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return false;
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}` === month;
+}
+
+function paymentLabel(order: Order) {
+  const mode = order.paymentMode === "PARCELADO" ? "Parcelado" : "À vista";
+  const methodMap: Record<string, string> = {
+    PIX: "Pix",
+    DINHEIRO: "Dinheiro",
+    CARTAO: "Cartão",
+    BOLETO: "Boleto",
+  };
+  const method = methodMap[String(order.paymentMethod || "").toUpperCase()] || String(order.paymentMethod || "").trim();
+  return method ? `${mode} • ${method}` : mode;
 }
 
 export default function RelatoriosPage() {
@@ -31,9 +56,10 @@ export default function RelatoriosPage() {
   const tabs = useMemo(
     () => [
       { key: "summary", label: "Resumo" },
-      { key: "cash", label: "DFC" },
+      { key: "cash", label: "Demonstração dos Fluxos de Caixa (DFC)" },
       { key: "overdue", label: "Vencidos" },
-      { key: "tx", label: "Transações" },
+      { key: "tx", label: "Últimas transações" },
+      { key: "sales", label: "Histórico de vendas" },
     ],
     []
   );
@@ -44,13 +70,18 @@ export default function RelatoriosPage() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [pack, setPack] = useState<any>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
 
   async function load() {
     setLoading(true);
     setErr(null);
     try {
-      const data = await getReportPack({ month, basis });
-      setPack(data);
+      const [packData, ordersData] = await Promise.all([
+        getReportPack({ month, basis }),
+        listOrders().catch(() => []),
+      ]);
+      setPack(packData);
+      setOrders(ordersData);
     } catch (e: any) {
       setErr(e?.message || "Erro ao carregar relatório.");
     } finally {
@@ -83,13 +114,25 @@ export default function RelatoriosPage() {
   const overdue = pack?.overdue || {};
   const lastTx = pack?.lastTransactions || [];
 
+  const salesRows = useMemo(() => {
+    return (orders || [])
+      .filter((order) => order.status !== "ORCAMENTO")
+      .filter((order) => isInMonth(order.createdAt, month) || isInMonth(order.expectedDeliveryAt || null, month))
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+  }, [orders, month]);
+
+  const salesTotalCents = useMemo(
+    () => salesRows.reduce((acc, order) => acc + (Number(order.totalCents) || 0), 0),
+    [salesRows]
+  );
+
   return (
     <div ref={wrapRef} className="space-y-4">
       <div data-stagger>
         <PageHeader
           title="Relatórios"
-          subtitle="Pack completo: resumo, DRE, DFC, vencidos e últimas transações."
-          badge={{ label: "M5", tone: "brand" }}
+          subtitle="Resumo financeiro, DRE, DFC, vencidos, últimas transações e histórico de vendas."
+          badge={{ label: "Gestão", tone: "brand" }}
           right={
             <div className="flex flex-wrap items-center gap-2">
               <div className="w-[170px]">
@@ -101,10 +144,10 @@ export default function RelatoriosPage() {
                 />
               </div>
 
-              <div className="w-[170px]">
+              <div className="w-[210px]">
                 <Select value={basis} onChange={(e) => setBasis(e.target.value as any)}>
-                  <option value="due">Base: DUE</option>
-                  <option value="paid">Base: PAID</option>
+                  <option value="due">Base: por vencimento</option>
+                  <option value="paid">Base: por pagamento</option>
                 </Select>
               </div>
 
@@ -136,25 +179,25 @@ export default function RelatoriosPage() {
         <div className="grid gap-3 lg:grid-cols-[1.1fr_0.9fr]" data-stagger>
           <GlassCard className="p-4">
             <div className="flex items-center justify-between">
-              <div className="font-display text-sm font-black text-[color:var(--ink)]">Resumo</div>
-              <Badge tone="ink">{loading ? "Carregando…" : `Mês: ${month}`}</Badge>
+              <div className="font-display text-sm font-black text-[color:var(--ink)]">Resumo do período</div>
+              <Badge tone="ink">{loading ? "Carregando…" : `Base: ${reportBasisLabel(basis)}`}</Badge>
             </div>
 
             <div className="mt-3 grid gap-3 sm:grid-cols-3">
               <GlassCard className="p-4">
-                <div className="text-xs font-extrabold text-[color:var(--muted)]">Receitas (Real)</div>
+                <div className="text-xs font-extrabold text-[color:var(--muted)]">Receitas</div>
                 <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">
                   {moneyBRLFromCents(summary.revenueCents || 0)}
                 </div>
-                <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Entradas pagas</div>
+                <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Entradas efetivas no período</div>
               </GlassCard>
 
               <GlassCard className="p-4">
-                <div className="text-xs font-extrabold text-[color:var(--muted)]">Despesas (Real)</div>
+                <div className="text-xs font-extrabold text-[color:var(--muted)]">Despesas</div>
                 <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">
                   {moneyBRLFromCents(summary.expensesCents || 0)}
                 </div>
-                <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Saídas pagas</div>
+                <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Saídas efetivas no período</div>
               </GlassCard>
 
               <GlassCard className="p-4">
@@ -162,17 +205,17 @@ export default function RelatoriosPage() {
                 <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">
                   {moneyBRLFromCents(summary.netCents || 0)}
                 </div>
-                <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Receitas - Despesas</div>
+                <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Receitas menos despesas</div>
               </GlassCard>
             </div>
           </GlassCard>
 
           <DataTable
-            title="DRE"
-            subtitle={`Base: ${basis.toUpperCase()}`}
+            title="Demonstração do Resultado do Exercício (DRE)"
+            subtitle={`Base: ${reportBasisLabel(basis)}`}
             rows={[
               { k: "Receita do período", v: moneyBRLFromCents(dre.revenueCents || 0) },
-              { k: "CMV / Custos variáveis", v: moneyBRLFromCents(dre.variableCostsCents || 0) },
+              { k: "Custos variáveis", v: moneyBRLFromCents(dre.variableCostsCents || 0) },
               { k: "Lucro bruto", v: moneyBRLFromCents(dre.grossProfitCents || 0) },
               { k: "Custos fixos", v: moneyBRLFromCents(dre.fixedCostsCents || 0) },
               { k: "Lucro operacional", v: moneyBRLFromCents(dre.operatingProfitCents || 0) },
@@ -190,11 +233,11 @@ export default function RelatoriosPage() {
       {tab === "cash" ? (
         <div className="space-y-3" data-stagger>
           <DataTable
-            title="DFC"
-            subtitle="Real x Projetado"
+            title="Demonstração dos Fluxos de Caixa (DFC)"
+            subtitle="Realizado x projetado"
             rows={[
               {
-                kind: "Real",
+                kind: "Realizado",
                 initial: dfcReal.initialBalanceCents || 0,
                 ins: dfcReal.inCents || 0,
                 outs: dfcReal.outCents || 0,
@@ -220,7 +263,7 @@ export default function RelatoriosPage() {
 
           <DataTable
             title="Próximos vencimentos"
-            subtitle="7/15/30 dias"
+            subtitle="Janelas de 7, 15 e 30 dias"
             rows={[
               { d: "7 dias", recv: upcoming?.d7?.toReceiveCents || 0, pay: upcoming?.d7?.toPayCents || 0 },
               { d: "15 dias", recv: upcoming?.d15?.toReceiveCents || 0, pay: upcoming?.d15?.toPayCents || 0 },
@@ -239,7 +282,7 @@ export default function RelatoriosPage() {
       {tab === "overdue" ? (
         <div className="space-y-3" data-stagger>
           <GlassCard className="p-4">
-            <div className="font-display text-sm font-black text-[color:var(--ink)]">Vencidos</div>
+            <div className="font-display text-sm font-black text-[color:var(--ink)]">Movimentos vencidos</div>
             <div className="mt-1 text-sm font-semibold text-[color:var(--muted)]">
               A receber: {moneyBRLFromCents(overdue?.totals?.toReceiveCents || 0)} • A pagar:{" "}
               {moneyBRLFromCents(overdue?.totals?.toPayCents || 0)}
@@ -248,15 +291,15 @@ export default function RelatoriosPage() {
 
           <DataTable
             title="Itens vencidos"
-            subtitle="Até 25 itens (igual legado)"
+            subtitle="Até 25 registros"
             rows={(overdue?.items || []).slice(0, 25)}
             rowKey={(r: any, i: number) => r.id || `od_${i}`}
             columns={[
-              { header: "Venc.", cell: (r: any) => isoToBR(r.dueDate) },
-              { header: "Tipo", cell: (r: any) => r.kind },
+              { header: "Vencimento", cell: (r: any) => isoToBR(r.dueDate) },
+              { header: "Tipo", cell: (r: any) => r.kind === "PAYABLE" ? "Pagamento" : r.kind === "RECEIVABLE" ? "Recebimento" : r.kind },
               { header: "Título", cell: (r: any) => r.subtitle || r.title || "—" },
               { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents || 0) },
-              { header: "Status", cell: (r: any) => r.status || "PENDENTE" },
+              { header: "Status", cell: (r: any) => <StatusPill tone={financeStatusTone(r.status || "VENCIDO") as any} label={financeStatusLabel(r.status || "VENCIDO")} /> },
             ]}
           />
         </div>
@@ -265,19 +308,52 @@ export default function RelatoriosPage() {
       {tab === "tx" ? (
         <div data-stagger>
           <DataTable
-            title="Últimas transações"
-            subtitle="Pack lastTransactions"
+            title="Últimas transações do período"
+            subtitle="Movimentações financeiras mais recentes"
             rows={lastTx}
             rowKey={(r: any, i: number) => r.id || `tx_${i}`}
             columns={[
               { header: "Data", cell: (r: any) => isoToBR(r.occurredAt) },
-              { header: "Origem", cell: (r: any) => r.source },
+              { header: "Origem", cell: (r: any) => r.source || "—" },
               { header: "Nome", cell: (r: any) => r.name },
               {
                 header: "Valor",
                 className: "text-right font-extrabold",
                 cell: (r: any) => `${r.type === "IN" ? "+" : "-"}${moneyBRLFromCents(r.amountCents || 0)}`,
               },
+            ]}
+          />
+        </div>
+      ) : null}
+
+      {tab === "sales" ? (
+        <div className="space-y-3" data-stagger>
+          <div className="grid gap-3 md:grid-cols-3">
+            <GlassCard className="p-4">
+              <div className="text-xs font-extrabold text-[color:var(--muted)]">Vendas no período</div>
+              <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">{salesRows.length}</div>
+              <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Pedidos criados ou com entrega no mês</div>
+            </GlassCard>
+
+            <GlassCard className="p-4 md:col-span-2">
+              <div className="text-xs font-extrabold text-[color:var(--muted)]">Total vendido no período</div>
+              <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">{moneyBRLFromCents(salesTotalCents)}</div>
+              <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Histórico consolidado das vendas cadastradas no sistema</div>
+            </GlassCard>
+          </div>
+
+          <DataTable
+            title="Histórico de vendas"
+            subtitle={`Pedidos do mês ${month}`}
+            rows={salesRows}
+            rowKey={(r) => r.id}
+            columns={[
+              { header: "Criado em", cell: (r) => isoToBR(r.createdAt) },
+              { header: "Cliente", cell: (r) => r.clientName || "—" },
+              { header: "Status", cell: (r) => <StatusPill tone={orderStatusTone(r.status) as any} label={orderStatusLabel(r.status)} /> },
+              { header: "Entrega prevista", cell: (r) => isoToBR(r.expectedDeliveryAt || null) },
+              { header: "Pagamento", cell: (r) => paymentLabel(r) },
+              { header: "Valor", className: "text-right font-extrabold", cell: (r) => moneyBRLFromCents(r.totalCents || 0) },
             ]}
           />
         </div>

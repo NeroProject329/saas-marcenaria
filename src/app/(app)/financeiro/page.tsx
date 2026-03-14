@@ -18,8 +18,9 @@ import Badge from "@/components/ui/Badge";
 import WaveMiniCard from "@/components/charts/WaveMiniCard";
 
 import { useGsapStagger } from "@/motion/useGsapStagger";
-import { moneyBRLFromCents, isoToBR, isoToDateInput, parseBRLToCents, dateInputToISO, uid } from "@/lib/format";
+import { moneyBRLFromCents, isoToBR, isoToDateInput, parseBRLToCents, dateInputToISO } from "@/lib/format";
 import type { FinanceCategory, FinanceTransaction, Payable, Receivable } from "@/lib/types";
+import { financeStatusLabel, sourceLabel, sourceTone } from "@/lib/status";
 
 import {
   getCashflowByRange,
@@ -51,6 +52,59 @@ function tabAccent(tab: Tab) {
   }
 }
 
+function normalizeStatus(value?: string | null) {
+  return String(value || "").trim().toUpperCase();
+}
+
+function canManageTransaction(tx?: FinanceTransaction | null) {
+  const source = String(tx?.source || "").trim().toUpperCase();
+  return !source || source === "MANUAL" || source === "MANUAL_ENTRY" || source === "MANUAL_TRANSACTION";
+}
+
+function receivableStatusTone(status?: string | null) {
+  switch (normalizeStatus(status)) {
+    case "PAGO":
+    case "PAID":
+      return "success";
+    case "ABERTO":
+    case "OPEN":
+      return "brand";
+    case "PARCIAL":
+    case "PARTIAL":
+      return "warning";
+    case "VENCIDO":
+    case "OVERDUE":
+      return "danger";
+    case "CANCELADO":
+    case "CANCELLED":
+      return "neutral";
+    default:
+      return "brand";
+  }
+}
+
+function payableStatusTone(status?: string | null) {
+  switch (normalizeStatus(status)) {
+    case "PAGO":
+    case "PAID":
+      return "success";
+    case "ABERTO":
+    case "OPEN":
+      return "wood";
+    case "PARCIAL":
+    case "PARTIAL":
+      return "info";
+    case "VENCIDO":
+    case "OVERDUE":
+      return "danger";
+    case "CANCELADO":
+    case "CANCELLED":
+      return "neutral";
+    default:
+      return "wood";
+  }
+}
+
 export default function FinanceiroPage() {
   const wrapRef = useRef<HTMLDivElement | null>(null);
 
@@ -63,7 +117,7 @@ export default function FinanceiroPage() {
 
   const tabs = useMemo(
     () => [
-      { key: "cashflow", label: "Fluxo" },
+      { key: "cashflow", label: "Fluxo de Caixa" },
       { key: "receivables", label: "Recebimentos" },
       { key: "payables", label: "Pagamentos" },
       { key: "transactions", label: "Extrato" },
@@ -74,19 +128,18 @@ export default function FinanceiroPage() {
   const [tab, setTab] = useState<Tab>("cashflow");
   const accent = tabAccent(tab);
 
-  // draft range
   const [draftFrom, setDraftFrom] = useState(() => {
     const d = new Date();
     d.setDate(1);
     return isoToDateInput(d.toISOString());
   });
+
   const [draftTo, setDraftTo] = useState(() => {
     const d = new Date();
     d.setMonth(d.getMonth() + 1, 0);
     return isoToDateInput(d.toISOString());
   });
 
-  // applied range
   const [from, setFrom] = useState(draftFrom);
   const [to, setTo] = useState(draftTo);
 
@@ -111,7 +164,6 @@ export default function FinanceiroPage() {
   const [txTypeFilter, setTxTypeFilter] = useState<"" | "IN" | "OUT">("");
   const [txCatFilter, setTxCatFilter] = useState<string>("");
 
-  // Modais
   const [txOpen, setTxOpen] = useState(false);
   const [catOpen, setCatOpen] = useState(false);
   const [txEditing, setTxEditing] = useState<FinanceTransaction | null>(null);
@@ -156,12 +208,18 @@ export default function FinanceiroPage() {
     try {
       const [cats, list] = await Promise.all([
         listCategories().catch(() => []),
-        listTransactions({ fromYmd: from, toYmd: to, type: txTypeFilter || "", categoryId: txCatFilter || "" }).catch(() => []),
+        listTransactions({
+          fromYmd: from,
+          toYmd: to,
+          type: txTypeFilter || "",
+          categoryId: txCatFilter || "",
+        }).catch(() => []),
       ]);
+
       setCategories(cats);
       setTxs(list);
     } catch {
-      // silencioso (UI mostra só se quiser)
+      // silencioso
     }
   }
 
@@ -222,7 +280,6 @@ export default function FinanceiroPage() {
       setTxOpen(false);
       setTxEditing(null);
 
-      // recarrega extrato + cashflow pra refletir
       await Promise.all([loadTxAndCats(), loadAllCore()]);
     } catch (e: any) {
       alert(e?.message || "Erro ao salvar lançamento.");
@@ -230,7 +287,7 @@ export default function FinanceiroPage() {
   }
 
   function editTx(t: FinanceTransaction) {
-    if (String(t.source || "MANUAL").toUpperCase() !== "MANUAL") return;
+    if (!canManageTransaction(t)) return;
 
     setTxEditing(t);
     setTxForm({
@@ -245,7 +302,7 @@ export default function FinanceiroPage() {
   }
 
   async function delTx(t: FinanceTransaction) {
-    if (String(t.source || "MANUAL").toUpperCase() !== "MANUAL") return;
+    if (!canManageTransaction(t)) return;
 
     const ok = confirm("Excluir este lançamento?");
     if (!ok) return;
@@ -271,18 +328,24 @@ export default function FinanceiroPage() {
     }
   }
 
+  const cashflowRows = [
+    { id: "1", label: "Saldo anterior", v: cashflow.previousBalanceCents },
+    { id: "2", label: "Entradas", v: cashflow.inCents },
+    { id: "3", label: "Saídas", v: cashflow.outCents },
+    { id: "4", label: "Saldo do mês", v: cashflow.balanceCents },
+  ];
+
   return (
     <div ref={wrapRef} className="space-y-4">
       <div data-stagger>
         <PageHeader
           title="Financeiro"
-          subtitle="Conectado ao backend (M5). Basis=due, include=all e filtros iguais ao legado."
+          subtitle="Entradas, saídas, recebimentos, pagamentos e extrato conectados ao backend."
           badge={{ label: "M5", tone: "brand" }}
           right={<Tabs items={tabs} value={tab} onChange={(k) => setTab(k as Tab)} />}
         />
       </div>
 
-      {/* Header strip */}
       <div data-stagger>
         <GlassCard className="relative overflow-hidden p-4 sm:p-5">
           <div className={`pointer-events-none absolute -top-12 -right-12 h-56 w-56 rounded-full blur-3xl ${accent.glow}`} />
@@ -292,11 +355,11 @@ export default function FinanceiroPage() {
             <div>
               <div className="flex items-center gap-2">
                 <Badge tone={accent.badgeTone}>{accent.label}</Badge>
-                {loading ? <Badge tone="ink">Carregando…</Badge> : <Badge tone="success">Online</Badge>}
+                {loading ? <Badge tone="ink">Carregando…</Badge> : <Badge tone="success">Atualizado</Badge>}
               </div>
               <div className="mt-2 font-display text-lg font-black text-[color:var(--ink)]">Período</div>
               <div className="mt-1 text-sm font-semibold text-[color:var(--muted)]">
-                Cashflow por vencimento (basis=due), igual no legado.
+                Fluxo de caixa por vencimento, igual ao comportamento do sistema legado.
               </div>
             </div>
 
@@ -307,7 +370,9 @@ export default function FinanceiroPage() {
               <div className="w-[160px]">
                 <Input type="date" value={draftTo} onChange={(e) => setDraftTo(e.target.value)} />
               </div>
-              <Button variant="dark" onClick={applyRange}>Aplicar</Button>
+              <Button variant="dark" onClick={applyRange}>
+                Aplicar
+              </Button>
             </div>
           </div>
         </GlassCard>
@@ -322,15 +387,37 @@ export default function FinanceiroPage() {
         </div>
       ) : null}
 
-      {/* KPIs */}
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" data-stagger>
-        <KpiCard label="Saldo anterior" value={moneyBRLFromCents(cashflow.previousBalanceCents)} icon={ArrowUpCircle} hint="Virada do mês" tone="neutral" />
-        <KpiCard label="Entradas" value={moneyBRLFromCents(cashflow.inCents)} icon={ArrowUpCircle} hint="Recebimentos + entradas" tone="success" />
-        <KpiCard label="Saídas" value={moneyBRLFromCents(cashflow.outCents)} icon={ArrowDownCircle} hint="Pagamentos + saídas" tone="danger" />
-        <KpiCard label="Saldo do mês" value={moneyBRLFromCents(cashflow.balanceCents)} icon={Wallet} hint="Anterior + Entradas - Saídas" tone="brand" />
+        <KpiCard
+          label="Saldo anterior"
+          value={moneyBRLFromCents(cashflow.previousBalanceCents)}
+          icon={ArrowUpCircle}
+          hint="Virada do mês"
+          tone="neutral"
+        />
+        <KpiCard
+          label="Entradas"
+          value={moneyBRLFromCents(cashflow.inCents)}
+          icon={ArrowUpCircle}
+          hint="Recebimentos + entradas"
+          tone="success"
+        />
+        <KpiCard
+          label="Saídas"
+          value={moneyBRLFromCents(cashflow.outCents)}
+          icon={ArrowDownCircle}
+          hint="Pagamentos + saídas"
+          tone="danger"
+        />
+        <KpiCard
+          label="Saldo do mês"
+          value={moneyBRLFromCents(cashflow.balanceCents)}
+          icon={Wallet}
+          hint="Anterior + Entradas - Saídas"
+          tone="brand"
+        />
       </section>
 
-      {/* Toolbar */}
       <div data-stagger>
         <Toolbar
           left={
@@ -348,7 +435,9 @@ export default function FinanceiroPage() {
                   <Select value={txCatFilter} onChange={(e) => setTxCatFilter(e.target.value)}>
                     <option value="">Categoria: Todas</option>
                     {categories.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
                     ))}
                   </Select>
                 </div>
@@ -356,7 +445,7 @@ export default function FinanceiroPage() {
             ) : (
               <div className="text-sm font-semibold text-[color:var(--muted)]">
                 {tab === "cashflow"
-                  ? "Mini-wave real por mês (entradas)."
+                  ? "Entradas mensais no período selecionado."
                   : tab === "receivables"
                   ? `Recebimentos do mês ${ymdToYm(from)}`
                   : tab === "payables"
@@ -387,39 +476,50 @@ export default function FinanceiroPage() {
         />
       </div>
 
-      {/* Conteúdo */}
       {tab === "cashflow" ? (
         <section className="grid gap-3 lg:grid-cols-[0.95fr_1.05fr]" data-stagger>
           <WaveMiniCard
-            title="Evolução"
-            subtitle="Entradas por mês (real)"
+            title="Evolução das Entradas"
+            subtitle="Valores recebidos por mês"
             points={cashflowPoints.length ? cashflowPoints : [{ label: "—", valueCents: 0 }]}
             accent="brand"
           />
 
-          <DataTable
-            title="Resumo do fluxo"
-            subtitle={`De ${from} até ${to} • /api/finance/cashflow`}
-            rows={[
-              { id: "1", label: "Saldo anterior", v: cashflow.previousBalanceCents },
-              { id: "2", label: "Entradas", v: cashflow.inCents },
-              { id: "3", label: "Saídas", v: cashflow.outCents },
-              { id: "4", label: "Saldo do mês", v: cashflow.balanceCents },
-            ]}
-            rowKey={(r) => r.id}
-            columns={[
-              { header: "Campo", cell: (r) => r.label },
-              { header: "Valor", className: "text-right font-extrabold", cell: (r) => moneyBRLFromCents(r.v) },
-            ]}
-          />
+          <GlassCard className="p-4">
+            <div className="flex items-center justify-between gap-2">
+              <div>
+                <div className="font-display text-sm font-black text-[color:var(--ink)]">
+                  Resumo do Fluxo de Caixa
+                </div>
+                <div className="text-xs font-semibold text-[color:var(--muted)]">
+                  De {isoToBR(from)} até {isoToBR(to)}
+                </div>
+              </div>
+              <Badge tone="brand">Sem scroll</Badge>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              {cashflowRows.map((row) => (
+                <div
+                  key={row.id}
+                  className="grid grid-cols-[1fr_auto] items-center gap-3 rounded-2xl border border-[color:var(--line)] bg-white/45 px-4 py-3"
+                >
+                  <div className="text-sm font-extrabold text-[color:var(--ink)]">{row.label}</div>
+                  <div className="text-right font-display text-base font-black text-[color:var(--ink)] sm:text-lg">
+                    {moneyBRLFromCents(row.v)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </GlassCard>
         </section>
       ) : null}
 
       {tab === "receivables" ? (
         <section data-stagger>
           <DataTable
-            title="Recebimentos"
-            subtitle="GET /api/finance/receivables/month"
+            title="Recebimentos do Mês"
+            subtitle={`Parcelas a receber do mês ${ymdToYm(from)}`}
             rows={receivables}
             rowKey={(r) => r.id}
             columns={[
@@ -427,15 +527,19 @@ export default function FinanceiroPage() {
               { header: "Cliente", cell: (r: any) => r.clientName },
               { header: "Descrição", cell: (r: any) => r.description },
               { header: "Parcela", cell: (r: any) => r.installmentLabel || "—" },
-              { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
+              {
+                header: "Valor",
+                className: "text-right font-extrabold",
+                cell: (r: any) => moneyBRLFromCents(r.amountCents),
+              },
               {
                 header: "Status",
-                cell: (r: any) =>
-                  String(r.status).toUpperCase() === "PAGO" ? (
-                    <StatusPill tone="success" label="Pago" />
-                  ) : (
-                    <StatusPill tone="warning" label="Aberto" />
-                  ),
+                cell: (r: any) => (
+                  <StatusPill
+                    tone={receivableStatusTone(r.status) as any}
+                    label={financeStatusLabel(r.status)}
+                  />
+                ),
               },
             ]}
           />
@@ -445,8 +549,8 @@ export default function FinanceiroPage() {
       {tab === "payables" ? (
         <section data-stagger>
           <DataTable
-            title="Pagamentos"
-            subtitle="GET /api/finance/payables/month"
+            title="Pagamentos do Mês"
+            subtitle={`Parcelas a pagar do mês ${ymdToYm(from)}`}
             rows={payables}
             rowKey={(r) => r.id}
             columns={[
@@ -454,15 +558,19 @@ export default function FinanceiroPage() {
               { header: "Fornecedor", cell: (r: any) => r.supplierName },
               { header: "Descrição", cell: (r: any) => r.description },
               { header: "Parcela", cell: (r: any) => r.installmentLabel || "—" },
-              { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
+              {
+                header: "Valor",
+                className: "text-right font-extrabold",
+                cell: (r: any) => moneyBRLFromCents(r.amountCents),
+              },
               {
                 header: "Status",
-                cell: (r: any) =>
-                  String(r.status).toUpperCase() === "PAGO" ? (
-                    <StatusPill tone="success" label="Pago" />
-                  ) : (
-                    <StatusPill tone="warning" label="Aberto" />
-                  ),
+                cell: (r: any) => (
+                  <StatusPill
+                    tone={payableStatusTone(r.status) as any}
+                    label={financeStatusLabel(r.status)}
+                  />
+                ),
               },
             ]}
           />
@@ -472,8 +580,8 @@ export default function FinanceiroPage() {
       {tab === "transactions" ? (
         <section data-stagger>
           <DataTable
-            title="Extrato"
-            subtitle="GET /api/finance/transactions?include=all (somente MANUAL editável)"
+            title="Extrato Financeiro"
+            subtitle="Lançamentos do período. Somente registros manuais podem ser editados."
             rows={txs}
             rowKey={(r) => r.id}
             right={<Badge tone="ink">Itens: {txs.length}</Badge>}
@@ -489,46 +597,52 @@ export default function FinanceiroPage() {
                   ),
               },
               {
-                header: "Source",
-                cell: (r: any) => {
-                  const s = String(r.source || "MANUAL").toUpperCase();
-                  if (s.includes("RECEIV")) return <StatusPill tone="success" label="Recebível" />;
-                  if (s.includes("PAYAB")) return <StatusPill tone="wood" label="Pagável" />;
-                  if (s.includes("COST")) return <StatusPill tone="warning" label="Custo" />;
-                  return <StatusPill tone="neutral" label="Manual" />;
-                },
+                header: "Origem",
+                cell: (r: any) => (
+                  <StatusPill tone={sourceTone(r.source) as any} label={sourceLabel(r.source)} />
+                ),
               },
               { header: "Categoria", cell: (r: any) => r.categoryName || "—" },
               { header: "Nome", cell: (r: any) => r.name },
-              { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
+              {
+                header: "Valor",
+                className: "text-right font-extrabold",
+                cell: (r: any) => moneyBRLFromCents(r.amountCents),
+              },
               {
                 header: "Ações",
                 className: "text-right",
-                cell: (r: any) => (
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      variant="ghost"
-                      onClick={() => editTx(r)}
-                      disabled={String(r.source || "MANUAL").toUpperCase() !== "MANUAL"}
-                    >
-                      Editar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      onClick={() => delTx(r)}
-                      disabled={String(r.source || "MANUAL").toUpperCase() !== "MANUAL"}
-                    >
-                      Excluir
-                    </Button>
-                  </div>
-                ),
+                cell: (r: any) => {
+                  const canManage = canManageTransaction(r);
+
+                  return (
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        variant="soft"
+                        onClick={() => editTx(r)}
+                        disabled={!canManage}
+                        className="border border-[rgba(41,72,110,0.28)] bg-[rgba(41,72,110,0.12)] text-[color:var(--ink)] hover:bg-[rgba(41,72,110,0.18)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Editar
+                      </Button>
+
+                      <Button
+                        variant="soft"
+                        onClick={() => delTx(r)}
+                        disabled={!canManage}
+                        className="border border-[rgba(220,38,38,0.28)] bg-[rgba(220,38,38,0.10)] text-[color:var(--ink)] hover:bg-[rgba(220,38,38,0.16)] disabled:cursor-not-allowed disabled:opacity-40"
+                      >
+                        Excluir
+                      </Button>
+                    </div>
+                  );
+                },
               },
             ]}
           />
         </section>
       ) : null}
 
-      {/* MODAL TX */}
       <Modal
         open={txOpen}
         title={txEditing ? "Editar lançamento" : "Novo lançamento"}
@@ -536,8 +650,12 @@ export default function FinanceiroPage() {
         onClose={() => setTxOpen(false)}
         footer={
           <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="soft" onClick={() => setTxOpen(false)}>Cancelar</Button>
-            <Button variant="dark" onClick={saveTx}>Salvar</Button>
+            <Button variant="soft" onClick={() => setTxOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="dark" onClick={saveTx}>
+              Salvar
+            </Button>
           </div>
         }
       >
@@ -552,7 +670,11 @@ export default function FinanceiroPage() {
 
           <div>
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Data</div>
-            <Input type="date" value={txForm.date} onChange={(e) => setTxForm((p) => ({ ...p, date: e.target.value }))} />
+            <Input
+              type="date"
+              value={txForm.date}
+              onChange={(e) => setTxForm((p) => ({ ...p, date: e.target.value }))}
+            />
           </div>
 
           <div className="sm:col-span-2">
@@ -562,15 +684,24 @@ export default function FinanceiroPage() {
 
           <div>
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Valor (R$)</div>
-            <Input value={txForm.amount} onChange={(e) => setTxForm((p) => ({ ...p, amount: e.target.value }))} placeholder="120,50" />
+            <Input
+              value={txForm.amount}
+              onChange={(e) => setTxForm((p) => ({ ...p, amount: e.target.value }))}
+              placeholder="120,50"
+            />
           </div>
 
           <div>
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Categoria</div>
-            <Select value={txForm.categoryId} onChange={(e) => setTxForm((p) => ({ ...p, categoryId: e.target.value }))}>
+            <Select
+              value={txForm.categoryId}
+              onChange={(e) => setTxForm((p) => ({ ...p, categoryId: e.target.value }))}
+            >
               <option value="">Sem categoria</option>
               {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
               ))}
             </Select>
           </div>
@@ -586,7 +717,6 @@ export default function FinanceiroPage() {
         </div>
       </Modal>
 
-      {/* MODAL CAT */}
       <Modal
         open={catOpen}
         title="Nova categoria"
@@ -595,8 +725,12 @@ export default function FinanceiroPage() {
         maxWidth="max-w-[640px]"
         footer={
           <div className="flex justify-end gap-2">
-            <Button variant="soft" onClick={() => setCatOpen(false)}>Cancelar</Button>
-            <Button variant="dark" onClick={saveCat}>Salvar</Button>
+            <Button variant="soft" onClick={() => setCatOpen(false)}>
+              Cancelar
+            </Button>
+            <Button variant="dark" onClick={saveCat}>
+              Salvar
+            </Button>
           </div>
         }
       >
@@ -605,6 +739,7 @@ export default function FinanceiroPage() {
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Nome</div>
             <Input value={catForm.name} onChange={(e) => setCatForm((p) => ({ ...p, name: e.target.value }))} />
           </div>
+
           <div>
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Tipo</div>
             <Select value={catForm.type} onChange={(e) => setCatForm((p) => ({ ...p, type: e.target.value as any }))}>

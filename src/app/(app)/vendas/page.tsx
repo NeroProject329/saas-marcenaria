@@ -58,14 +58,7 @@ import {
   deleteOrder,
   SaveOrderPayload,
 } from "@/services/orders.service";
-
-function statusTone(s: OrderStatus) {
-  const u = String(s).toUpperCase();
-  if (u === "ENTREGUE" || u === "PRONTO") return "success";
-  if (u === "CANCELADO") return "danger";
-  if (u === "EM_PRODUCAO" || u === "PEDIDO" || u === "ORCAMENTO") return "warning";
-  return "neutral";
-}
+import { orderStatusLabel, orderStatusTone } from "@/lib/status";
 
 function paymentBadge(mode?: PaymentMode | null, method?: PaymentMethod | null) {
   const m = String(mode || "").toUpperCase();
@@ -580,7 +573,7 @@ export default function VendasPage() {
           rowKey={(r) => r.id}
           columns={[
             { header: "Criado", cell: (r) => isoToBR(r.createdAt) },
-            { header: "Status", cell: (r) => <StatusPill tone={statusTone(r.status) as any} label={r.status.replaceAll("_", " ")} /> },
+            { header: "Status", cell: (r) => <StatusPill tone={orderStatusTone(r.status) as any} label={orderStatusLabel(r.status)} /> },
             { header: "Cliente", cell: (r) => r.clientName || "—" },
             { header: "Entrega", cell: (r) => isoToBR(r.expectedDeliveryAt || null) },
             { header: "Pagamento", cell: (r) => paymentBadge(r.paymentMode || null, r.paymentMethod || null) },
@@ -591,9 +584,27 @@ export default function VendasPage() {
               className: "text-right",
               cell: (r) => (
                 <div className="flex justify-end gap-2">
-                  <Button variant="ghost" onClick={() => openEdit(r.id)}>Ver/Editar</Button>
-                  <Button variant="ghost" onClick={() => onCancelOrder(r.id)}>Cancelar</Button>
-                  <Button variant="ghost" onClick={() => onDeleteOrder(r.id)}>Excluir</Button>
+                  <Button
+                    variant="soft"
+                    className="border-[rgba(59,130,246,0.18)] bg-[rgba(59,130,246,0.10)] text-[color:var(--ink)] hover:bg-[rgba(59,130,246,0.16)]"
+                    onClick={() => openEdit(r.id)}
+                  >
+                    Ver/Editar
+                  </Button>
+                  <Button
+                    variant="soft"
+                    className="border-[rgba(245,158,11,0.18)] bg-[rgba(245,158,11,0.12)] text-[color:var(--ink)] hover:bg-[rgba(245,158,11,0.18)]"
+                    onClick={() => onCancelOrder(r.id)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="soft"
+                    className="border-[rgba(220,38,38,0.18)] bg-[rgba(220,38,38,0.10)] text-[color:var(--ink)] hover:bg-[rgba(220,38,38,0.16)]"
+                    onClick={() => onDeleteOrder(r.id)}
+                  >
+                    Excluir
+                  </Button>
                 </div>
               ),
             },
@@ -604,11 +615,11 @@ export default function VendasPage() {
       {/* MODAL PEDIDO (COMPLETO) */}
       <Modal
         open={open}
-  title={editing ? "Editar pedido" : "Novo pedido"}
-  subtitle="POST /api/orders • PATCH /api/orders/:id/full"
-  onClose={() => setOpen(false)}
-  maxWidth="max-w-[1180px]"
-  footer={
+        title={editing ? "Editar pedido" : "Novo pedido"}
+        subtitle="POST /api/orders • PATCH /api/orders/:id/full"
+        onClose={() => setOpen(false)}
+        maxWidth="max-w-[1180px]"
+        footer={
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               {form.paymentMode === "PARCELADO" ? (
@@ -850,7 +861,7 @@ export default function VendasPage() {
 
                     <div className="sm:col-span-2 overflow-x-auto lg:overflow-x-hidden rounded-2xl border border-[color:var(--line)] bg-white/35">
                       <table className="w-full min-w-0 table-fixed text-sm">
-                       <colgroup><col className="w-[220px]" /><col /></colgroup>
+                        <colgroup><col className="w-[220px]" /><col /></colgroup>
                         <thead className="bg-white/55">
                           <tr>
                             <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">Vencimento</th>

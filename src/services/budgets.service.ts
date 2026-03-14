@@ -202,25 +202,57 @@ export async function deleteBudget(id: string): Promise<void> {
 
 /** PDF (blob) */
 export async function downloadBudgetPdf(id: string): Promise<Blob> {
-  const base = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
-  const url = `${base}/api/budgets/${id}/pdf`;
+  const envBase = String(process.env.NEXT_PUBLIC_API_URL || "")
+    .trim()
+    .replace(/\/$/, "");
+
+  const url = `${envBase}/api/budgets/${id}/pdf?download=1`;
 
   const t = getToken();
-  const res = await fetch(url, {
-    method: "GET",
-    headers: {
-      ...(t ? { Authorization: `Bearer ${t}` } : {}),
-    },
-  });
+  if (!t) {
+    throw new Error("Sem token. Faça login novamente.");
+  }
+
+  if (!envBase) {
+    throw new Error(
+      "NEXT_PUBLIC_API_URL não está definido no frontend."
+    );
+  }
+
+  let res: Response;
+
+  try {
+    res = await fetch(url, {
+      method: "GET",
+      mode: "cors",
+      cache: "no-store",
+      headers: {
+        Accept: "application/pdf",
+        Authorization: `Bearer ${t}`,
+      },
+    });
+  } catch (err: any) {
+    throw new Error(
+      `Falha de rede ao baixar PDF. Verifique a URL da API no frontend e o CORS do backend. URL usada: ${url}`
+    );
+  }
 
   if (!res.ok) {
+    const contentType = res.headers.get("content-type") || "";
     let msg = `Erro ${res.status} ao gerar PDF`;
+
     try {
-      const data = await res.json();
-      if (data?.message) msg = data.message;
+      if (contentType.includes("application/json")) {
+        const data = await res.json();
+        if (data?.message) msg = data.message;
+      } else {
+        const txt = await res.text();
+        if (txt) msg = txt;
+      }
     } catch {}
+
     throw new Error(msg);
   }
 
-  return res.blob();
+  return await res.blob();
 }

@@ -25,6 +25,7 @@ import StatusPill from "@/components/ui/StatusPill";
 import { useGsapStagger } from "@/motion/useGsapStagger";
 import { moneyBRLFromCents, isoToBR } from "@/lib/format";
 import WaveMiniCard from "@/components/charts/WaveMiniCard";
+import { financeStatusLabel, financeStatusTone, orderStatusLabel, orderStatusTone } from "@/lib/status";
 
 import {
   getDashboardOverview,
@@ -59,7 +60,7 @@ function lastNMonths(n: number) {
   d.setDate(1);
   for (let i = n - 1; i >= 0; i--) {
     const dd = new Date(d);
-    dd.setMonth(dd.getMonth() - i);
+    dd.setMonth(d.getMonth() - i);
     const mm = String(dd.getMonth() + 1).padStart(2, "0");
     out.push(mm);
   }
@@ -116,12 +117,12 @@ export default function DashboardClient() {
   const financeTabs = useMemo(
     () => [
       { key: "medias", label: "Médias" },
-      { key: "breakeven", label: "Break-even" },
-      { key: "dfc", label: "DFC" },
+      { key: "breakeven", label: "Ponto de equilíbrio" },
+      { key: "dfc", label: "Demonstração dos Fluxos de Caixa (DFC)" },
       { key: "receber", label: "Receber" },
       { key: "pagar", label: "Pagar" },
-      { key: "dre", label: "DRE" },
-      { key: "projetado", label: "Fluxo projetado" },
+      { key: "dre", label: "Demonstração do Resultado do Exercício (DRE)" },
+      { key: "projetado", label: "Fluxo de Caixa Projetado" },
       { key: "operacional", label: "Operacional" },
       { key: "insights", label: "Insights" },
     ],
@@ -190,7 +191,7 @@ export default function DashboardClient() {
       if (maybe > 0) setClientsCount(maybe);
       else loadClientsCount();
     } catch (e: any) {
-      setDashErr(e?.message || "Erro ao carregar Dashboard Plus.");
+      setDashErr(e?.message || "Erro ao carregar os indicadores do dashboard.");
     } finally {
       setDashLoading(false);
     }
@@ -227,14 +228,14 @@ export default function DashboardClient() {
         label: "Vendas",
         value: moneyBRLFromCents(revenueCents),
         icon: TrendingUp,
-        hint: "Faturamento (Dashboard Plus)",
+        hint: "Faturamento do período",
         tone: "success" as const,
       },
       {
         label: "Produção",
         value: moneyBRLFromCents(profitCents),
         icon: Hammer,
-        hint: "Lucro operacional (Dashboard Plus)",
+        hint: "Lucro operacional do período",
         tone: "wood" as const,
       },
       {
@@ -411,7 +412,7 @@ export default function DashboardClient() {
       <div data-stagger>
         <PageHeader
           title="Dashboard"
-          subtitle="Base premium alinhada com a referência. Dashboard Plus já conectado."
+          subtitle="Visão geral do negócio com entregas, recebimentos, pagamentos e indicadores financeiros."
           badge={{ label: "Premium", tone: "brand" }}
           right={
             <Tabs
@@ -444,9 +445,9 @@ export default function DashboardClient() {
             <div className="relative grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.12fr_0.88fr] lg:items-center">
               <div className="space-y-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="ink">Hero</Badge>
-                  <Badge tone="wood">Glass + Pills</Badge>
-                  <Badge tone="ink">Lux</Badge>
+                  <Badge tone="ink">Destaque</Badge>
+                  <Badge tone="wood">Vidro + cartões</Badge>
+                  <Badge tone="ink">Premium</Badge>
                 </div>
 
                 <h2 className="font-display text-2xl font-black tracking-tight text-[color:var(--ink)] sm:text-3xl">
@@ -454,7 +455,7 @@ export default function DashboardClient() {
                 </h2>
 
                 <p className="max-w-xl text-sm font-semibold text-black/65">
-                  No M6 este hero vira carrossel real com imagens dos seus projetos/produtos e animação GSAP.
+                  Aqui você pode destacar projetos, produtos e novidades do seu negócio com uma apresentação mais viva.
                 </p>
 
                 <div className="flex flex-wrap gap-2 pt-1">
@@ -479,9 +480,9 @@ export default function DashboardClient() {
                   <div className="rounded-[24px] bg-white/70 p-4">
                     <div className="flex items-center justify-between">
                       <div className="font-display text-sm font-black text-[color:var(--ink)]">
-                        Status rápido
+                        Visão rápida
                       </div>
-                      <div className="text-[11px] font-bold text-[color:var(--muted)]">Preview</div>
+                      <div className="text-[11px] font-bold text-[color:var(--muted)]">Prévia</div>
                     </div>
 
                     <div className="mt-3 grid gap-2">
@@ -538,7 +539,7 @@ export default function DashboardClient() {
                 {dashLoading ? (
                   <Badge tone="brand">Carregando</Badge>
                 ) : deliveriesPreview.length ? (
-                  <Badge tone="wood">{deliveriesPreview.length} itens</Badge>
+                  <Badge tone="wood">{deliveriesPreview.length} entregas</Badge>
                 ) : (
                   <Badge tone="ink">Sem itens</Badge>
                 )}
@@ -570,7 +571,7 @@ export default function DashboardClient() {
                         </div>
                       </div>
                       <div className="flex items-center">
-                        <StatusPill tone="neutral" label={String(r.status || "-")} />
+                        <StatusPill tone={orderStatusTone(r.status) as any} label={orderStatusLabel(r.status)} />
                       </div>
                     </div>
                   ))
@@ -584,7 +585,7 @@ export default function DashboardClient() {
 
             <WaveMiniCard
               title="Evolução"
-              subtitle="Receita mensal (Dashboard Plus)"
+              subtitle="Receita mensal do período"
               points={chartPoints}
               accent="brand"
             />
@@ -684,8 +685,8 @@ export default function DashboardClient() {
 
           {financeTab === "receber" ? (
             <DataTable
-              title="Recebíveis"
-              subtitle="..."
+              title="Recebimentos previstos"
+              subtitle="Parcelas e valores a receber lançados no sistema"
               rows={recvRows}
               rowKey={(r: any) => r.id}
               columns={[
@@ -695,19 +696,14 @@ export default function DashboardClient() {
                 { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
                 {
                   header: "Status",
-                  cell: (r: any) =>
-                    String(r.status).toUpperCase() === "PAGO" ? (
-                      <StatusPill tone="success" label="Pago" />
-                    ) : (
-                      <StatusPill tone="warning" label="Aberto" />
-                    ),
+                  cell: (r: any) => <StatusPill tone={financeStatusTone(r.status) as any} label={financeStatusLabel(r.status)} />,
                 },
               ]}
             />
           ) : financeTab === "pagar" ? (
             <DataTable
-              title="Pagáveis"
-              subtitle="..."
+              title="Pagamentos previstos"
+              subtitle="Contas e parcelas a pagar lançadas no sistema"
               rows={payRows}
               rowKey={(r: any) => r.id}
               columns={[
@@ -717,12 +713,7 @@ export default function DashboardClient() {
                 { header: "Valor", className: "text-right font-extrabold", cell: (r: any) => moneyBRLFromCents(r.amountCents) },
                 {
                   header: "Status",
-                  cell: (r: any) =>
-                    String(r.status).toUpperCase() === "PAGO" ? (
-                      <StatusPill tone="success" label="Pago" />
-                    ) : (
-                      <StatusPill tone="warning" label="Aberto" />
-                    ),
+                  cell: (r: any) => <StatusPill tone={financeStatusTone(r.status) as any} label={financeStatusLabel(r.status)} />,
                 },
               ]}
             />
@@ -738,15 +729,15 @@ export default function DashboardClient() {
               <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                 <KpiCard label="Entradas" value={moneyBRLFromCents(dfcTotals.inCents)} icon={ArrowUpCircle} hint={`Total do mês (DFC real) • ${endMonth}`} tone="success" />
                 <KpiCard label="Saídas" value={moneyBRLFromCents(dfcTotals.outCents)} icon={ArrowDownCircle} hint={`Total do mês (DFC real) • ${endMonth}`} tone="danger" />
-                <KpiCard label="Relatório DRE" value={moneyBRLFromCents(dreOperatingCents)} icon={FileText} hint={`Lucro operacional (DRE) • ${endMonth}`} tone="brand" />
-                <KpiCard label="Fluxo projetado" value={moneyBRLFromCents(projectedFinalCents)} icon={TrendingUp} hint={`Saldo final projetado (DFC) • ${endMonth}`} tone="neutral" />
+                <KpiCard label="Resultado operacional (DRE)" value={moneyBRLFromCents(dreOperatingCents)} icon={FileText} hint={`Lucro operacional do mês • ${endMonth}`} tone="brand" />
+                <KpiCard label="Fluxo de Caixa Projetado" value={moneyBRLFromCents(projectedFinalCents)} icon={TrendingUp} hint={`Saldo final projetado do mês • ${endMonth}`} tone="neutral" />
               </div>
 
               {financeTab === "breakeven" ? (
                 <div className="mt-4">
                   <DataTable
-                    title="Projeções (3 meses)"
-                    subtitle="GET /api/reports/projections"
+                    title="Projeções dos próximos 3 meses"
+                    subtitle="Estimativa de entradas, saídas e saldo"
                     rows={projItems}
                     rowKey={(r: any, i: number) => r.month || `m_${i}`}
                     columns={[
@@ -762,8 +753,8 @@ export default function DashboardClient() {
               {financeTab === "dfc" ? (
                 <div className="mt-4">
                   <DataTable
-                    title="DFC (Real)"
-                    subtitle="GET /api/reports/dfc"
+                    title="Demonstração dos Fluxos de Caixa (DFC) — Real"
+                    subtitle="Entradas, saídas e saldo diário do período"
                     rows={dfcSeries}
                     rowKey={(r: any, i: number) => r.day || `d_${i}`}
                     columns={[
@@ -779,8 +770,8 @@ export default function DashboardClient() {
               {financeTab === "dre" ? (
                 <div className="mt-4">
                   <DataTable
-                    title="DRE"
-                    subtitle="GET /api/reports/dre"
+                    title="Demonstração do Resultado do Exercício (DRE)"
+                    subtitle="Resultado operacional consolidado do período"
                     rows={dreRows}
                     rowKey={(r: any, i: number) => `${r.k}_${i}`}
                     columns={[
@@ -794,8 +785,8 @@ export default function DashboardClient() {
               {financeTab === "projetado" ? (
                 <div className="mt-4">
                   <DataTable
-                    title="Fluxo projetado"
-                    subtitle="DFC projected.series"
+                    title="Fluxo de Caixa Projetado"
+                    subtitle="Saldo estimado com base nas projeções"
                     rows={dfcProjectedSeries}
                     rowKey={(r: any, i: number) => r.day || `p_${i}`}
                     columns={[
@@ -812,7 +803,7 @@ export default function DashboardClient() {
                 <div className="mt-4">
                   <DataTable
                     title="Próximas entregas"
-                    subtitle="GET /api/dashboard/overview (upcomingDeliveries)"
+                    subtitle="Pedidos em andamento organizados por previsão de entrega"
                     rows={overviewData?.upcomingDeliveries || []}
                     rowKey={(r: any, i: number) => r.id || `o_${i}`}
                     columns={[
@@ -820,7 +811,7 @@ export default function DashboardClient() {
                       { header: "Cliente", cell: (r: any) => r.client?.name || "-" },
                       { header: "Criado", cell: (r: any) => isoToBR(r.createdAt) },
                       { header: "Entrega", cell: (r: any) => isoToBR(r.expectedDeliveryAt) },
-                      { header: "Status", cell: (r: any) => <StatusPill tone="neutral" label={String(r.status || "-")} /> },
+                      { header: "Status", cell: (r: any) => <StatusPill tone={orderStatusTone(r.status) as any} label={orderStatusLabel(r.status)} /> },
                     ]}
                   />
                 </div>

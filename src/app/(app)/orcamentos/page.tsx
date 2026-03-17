@@ -39,6 +39,7 @@ import {
   uid,
 } from "@/lib/format";
 import type { Client } from "@/lib/types";
+import { budgetStatusLabel, budgetStatusTone } from "@/lib/status";
 
 import { listClients, createClient } from "@/services/clients.service";
 import { getCostsSummary } from "@/services/costs.service";
@@ -81,22 +82,16 @@ function currentMonthYYYYMM() {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function statusTone(s: BudgetStatus) {
-  const u = String(s).toUpperCase();
-  if (u === "APROVADO") return "success";
-  if (u === "CANCELADO" || u === "REJEITADO") return "danger";
-  if (u === "ENVIADO") return "warning";
-  return "neutral";
-}
 
 function payLabel(b: Budget) {
-  const mode = b.paymentMode || "AVISTA";
-  const method = b.paymentMethod ? ` • ${b.paymentMethod}` : "";
-  const inst =
-    b.installmentsCount && b.installmentsCount > 1
-      ? ` • ${b.installmentsCount}x`
-      : "";
-  return `${mode}${method}${inst}`;
+  const count = Math.max(1, Number(b.installmentsCount || 1));
+  const cash = Number(b.cashTotalCents ?? b.totalCents ?? 0);
+  const installmentTotal = Number(b.installmentTotalCents ?? b.totalCents ?? 0);
+  const installmentAmount = Number(
+    b.installmentAmountCents ?? Math.round(installmentTotal / count)
+  );
+
+  return `À vista ${moneyBRLFromCents(cash)} • ${count}x de ${moneyBRLFromCents(installmentAmount)}`;
 }
 
 function safeDateISO(dateInput: string) {
@@ -219,12 +214,12 @@ export default function OrcamentosPage() {
 
     discountType: "VALOR" as DiscountType,
     discount: "0,00",
-    discountPreset: 0,
+   discountPreset: "0",
 
-    paymentMode: "AVISTA" as PayMode,
-    paymentMethod: "",
-    installmentsCount: 3,
-    cardFeePercent: "12,30",
+paymentMode: "PARCELADO" as PayMode,
+paymentMethod: "CARTAO",
+installmentsCount: 3,
+cardFeePercent: "12,30",
   });
 
   const [items, setItems] = useState<ItemDraft[]>([
@@ -361,12 +356,12 @@ export default function OrcamentosPage() {
 
       discountType: "VALOR",
       discount: "0,00",
-      discountPreset: 0,
+     discountPreset: "0",
 
-      paymentMode: "AVISTA",
-      paymentMethod: "",
-      installmentsCount: 3,
-      cardFeePercent: "12,30",
+paymentMode: "PARCELADO",
+paymentMethod: "CARTAO",
+installmentsCount: 3,
+cardFeePercent: "12,30",
     });
 
     setItems([
@@ -403,12 +398,12 @@ export default function OrcamentosPage() {
 
         discountType: (b.discountType || "VALOR") as any,
         discount: String(((b.discountCents || 0) / 100).toFixed(2)).replace(".", ","),
-        discountPreset: Math.trunc(Number(b.discountPercent || 0)),
+        discountPreset: String(Number(b.discountPercent || 0)).replace(".", ","),
 
-        paymentMode: (b.paymentMode || "AVISTA") as any,
-        paymentMethod: b.paymentMethod || "",
-        installmentsCount: b.installmentsCount || 3,
-        cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".", ","),
+        paymentMode: (b.paymentMode || "PARCELADO") as any,
+paymentMethod: b.paymentMethod || "CARTAO",
+installmentsCount: b.installmentsCount || 3,
+cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".", ","),
       });
 
       setItems(
@@ -508,86 +503,108 @@ export default function OrcamentosPage() {
     });
   }, [items]);
 
-  const calc = useMemo(() => {
-    const dailyRateCents = parseBRLToCents(form.dailyRate);
-    const days = Math.max(0, Number(form.deliveryDays || 0));
-    const laborCents = dailyRateCents * days;
+ const calc = useMemo(() => {
+  const dailyRateCents = parseBRLToCents(form.dailyRate);
+  const days = Math.max(0, Number(form.deliveryDays || 0));
+  const laborCents = dailyRateCents * days;
 
-    const costItems = itemsInfo.reduce((acc, it) => acc + it.materialsTotalCents, 0);
-    const projectCost = costItems + laborCents;
+  const materialsCents = itemsInfo.reduce(
+    (acc, it) => acc + it.materialsTotalCents,
+    0
+  );
 
-    const method = String(form.paymentMethod || "").toUpperCase();
+  const projectCostCents = materialsCents + laborCents;
 
-    let cardFeePercent = 0;
-    if (form.paymentMode === "PARCELADO" && method === "CARTAO") {
-      const parsed = Number(String(form.cardFeePercent || "0").replace(",", "."));
-      cardFeePercent = Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
-    }
+  let profitPercent = Number(form.profitPercent || 0);
+  if (!Number.isFinite(profitPercent) || profitPercent < 0) profitPercent = 0;
 
-    const cardFeeCents =
-      form.paymentMode === "PARCELADO" && method === "CARTAO"
-        ? Math.round(projectCost * (cardFeePercent / 100))
-        : 0;
+  const profitCents = Math.round(projectCostCents * (profitPercent / 100));
+  const grossTotalCents = Math.max(0, projectCostCents + profitCents);
 
-    const baseForProfit = projectCost + cardFeeCents;
+  let discountPct = 0;
+  let discountCents = 0;
 
-    let profitPercent = Number(form.profitPercent || 0);
-    if (!Number.isFinite(profitPercent) || profitPercent < 0) profitPercent = 0;
+ if (form.discountType === "PERCENT") {
+  const parsedDiscountPct = Number(
+    String(form.discountPreset || "0").replace(",", ".")
+  );
+  discountPct =
+    Number.isFinite(parsedDiscountPct) && parsedDiscountPct > 0
+      ? parsedDiscountPct
+      : 0;
 
-    const targetProfitCents = Math.round(baseForProfit * (profitPercent / 100));
-    const totalBeforeDiscount = baseForProfit + targetProfitCents;
+  discountCents = Math.round(grossTotalCents * (discountPct / 100));
+} else {
+  discountCents = parseBRLToCents(form.discount);
+}
 
-    let discountCents = 0;
-    let discountPct = 0;
+  if (discountCents > grossTotalCents) {
+    discountCents = grossTotalCents;
+  }
 
-    if (form.paymentMode === "AVISTA") {
-      if (form.discountType === "PERCENT") {
-        discountPct = Number(form.discountPreset || 0) || 0;
-        discountCents = Math.round(totalBeforeDiscount * (discountPct / 100));
-      } else {
-        discountCents = parseBRLToCents(form.discount);
-      }
-    }
+  const cashTotalCents = Math.max(0, grossTotalCents - discountCents);
 
-    if (discountCents > totalBeforeDiscount) discountCents = totalBeforeDiscount;
+  const parsedCard = Number(String(form.cardFeePercent || "0").replace(",", "."));
+  const cardFeePercent =
+    Number.isFinite(parsedCard) && parsedCard >= 0 ? parsedCard : 0;
 
-    const totalCliente = Math.max(0, totalBeforeDiscount - discountCents);
-    const profit = totalCliente - baseForProfit;
-    const margin = totalCliente > 0 ? (profit / totalCliente) * 100 : 0;
-
-    const allocation = allocateTotalAcrossItems(
-      items.map((it, idx) => ({
-        quantity: Math.max(1, it.quantity || 1),
-        materialsCostPerUnitCents: itemsInfo[idx]?.materialsCostPerUnitCents || 0,
-      })),
-      totalBeforeDiscount
-    );
-
-    return {
-      dailyRateCents,
-      days,
-      laborCents,
-      costItems,
-      projectCost,
-      cardFeePercent,
-      cardFeeCents,
-      baseForProfit,
-      profitPercent,
-      totalBeforeDiscount,
-      discountCents,
-      discountPct,
-      totalCliente,
-      profit,
-      margin,
-      allocation,
-    };
-  }, [form, items, itemsInfo]);
-
-  const discountEnabled = form.paymentMode === "AVISTA";
-  const installmentsVisible = form.paymentMode === "PARCELADO";
-  const showCardFee =
-    form.paymentMode === "PARCELADO" &&
+  const isCardInstallment =
     String(form.paymentMethod || "").toUpperCase() === "CARTAO";
+
+  const cardFeeCents = isCardInstallment
+    ? Math.round(grossTotalCents * (cardFeePercent / 100))
+    : 0;
+
+  const installmentTotalCents = Math.max(0, grossTotalCents + cardFeeCents);
+
+  const installmentsCount = clamp(Number(form.installmentsCount || 3), 2, 24);
+  const installmentAmountCents = Math.round(
+    installmentTotalCents / installmentsCount
+  );
+
+  const profitOnCashCents = cashTotalCents - projectCostCents;
+  const marginOnCashPct =
+    cashTotalCents > 0 ? (profitOnCashCents / cashTotalCents) * 100 : 0;
+
+  const allocation = allocateTotalAcrossItems(
+    items.map((it, idx) => ({
+      quantity: Math.max(1, it.quantity || 1),
+      materialsCostPerUnitCents: itemsInfo[idx]?.materialsCostPerUnitCents || 0,
+    })),
+    grossTotalCents
+  );
+
+  return {
+    dailyRateCents,
+    days,
+    laborCents,
+    materialsCents,
+    projectCostCents,
+
+    profitPercent,
+    profitCents,
+
+    grossTotalCents,
+
+    discountPct,
+    discountCents,
+    cashTotalCents,
+
+    cardFeePercent,
+    cardFeeCents,
+    installmentTotalCents,
+    installmentAmountCents,
+    installmentsCount,
+
+    profitOnCashCents,
+    marginOnCashPct,
+
+    allocation,
+  };
+}, [form, items, itemsInfo]);
+
+
+  const showCardFee = String(form.paymentMethod || "").toUpperCase() === "CARTAO";
 
   const kpis = useMemo(() => {
     const drafts = budgets.filter((b) => b.status === "RASCUNHO").length;
@@ -625,7 +642,7 @@ export default function OrcamentosPage() {
       }
     }
 
-    if (calc.projectCost <= 0) {
+    if (calc.projectCostCents <= 0) {
       return alert(
         "Informe materiais e/ou custo do dia para gerar um custo do projeto > 0."
       );
@@ -640,46 +657,58 @@ export default function OrcamentosPage() {
       expectedDeliveryAt = d.toISOString();
     }
 
-    let installmentsCount = 1;
-    if (form.paymentMode === "PARCELADO") {
-      installmentsCount = clamp(Number(form.installmentsCount || 2), 2, 24);
-      if (installmentsCount < 2 || installmentsCount > 24) {
-        return alert("Parcelas deve ser entre 2 e 24.");
-      }
-    }
+    const installmentsCount = clamp(Number(form.installmentsCount || 3), 2, 24);
+if (installmentsCount < 2 || installmentsCount > 24) {
+  return alert("Parcelas deve ser entre 2 e 24.");
+}
 
-    const payload: SaveBudgetPayload = {
-      clientId: form.clientId,
-      expectedDeliveryAt,
-      notes: form.notes || "",
-      discountCents: calc.discountCents,
-      discountType: form.discountType,
-      discountPercent: form.discountType === "PERCENT" ? calc.discountPct : null,
-      deliveryDays: calc.days,
-      dailyRateCents: calc.dailyRateCents,
-      paymentMode: form.paymentMode,
-      paymentMethod: form.paymentMethod || null,
-      installmentsCount,
-      firstDueDate: expectedDeliveryAt,
-      profitPercent: calc.profitPercent,
-      cardFeePercent: calc.cardFeePercent,
-      items: items.map((it, idx) => {
-        const alloc = calc.allocation[idx] || { unit: 0 };
-        return {
-          name: it.name.trim(),
-          description: it.description?.trim() || null,
-          quantity: Math.max(1, Number(it.quantity || 1)),
-          unitPriceCents: alloc.unit,
-          materials: (it.materials || [])
-            .map((m) => ({
-              name: m.name.trim(),
-              qty: Number(m.qty || 0),
-              unitCostCents: parseBRLToCents(m.unit),
-            }))
-            .filter((m) => m.name && m.qty > 0),
-        };
-      }),
+   const payload: SaveBudgetPayload = {
+  clientId: form.clientId,
+  expectedDeliveryAt,
+  notes: form.notes || "",
+
+  discountCents: calc.discountCents,
+  discountType: form.discountType,
+  discountPercent: form.discountType === "PERCENT" ? calc.discountPct : undefined,
+
+  deliveryDays: calc.days,
+  dailyRateCents: calc.dailyRateCents,
+
+  // técnico / compatibilidade até ajustarmos approveBudget
+  paymentMode: "PARCELADO",
+ paymentMethod:
+  form.paymentMethod === "PIX" ||
+  form.paymentMethod === "CARTAO" ||
+  form.paymentMethod === "DINHEIRO" ||
+  form.paymentMethod === "BOLETO" ||
+  form.paymentMethod === "TRANSFERENCIA" ||
+  form.paymentMethod === "OUTRO"
+    ? form.paymentMethod
+    : "CARTAO",
+  installmentsCount,
+  firstDueDate: expectedDeliveryAt,
+
+  profitPercent: calc.profitPercent,
+  cardFeePercent: calc.cardFeePercent,
+
+  items: items.map((it, idx) => {
+    const alloc = calc.allocation[idx] || { unit: 0 };
+
+    return {
+      name: it.name.trim(),
+      description: it.description?.trim() || null,
+      quantity: Math.max(1, Number(it.quantity || 1)),
+      unitPriceCents: alloc.unit,
+      materials: (it.materials || [])
+        .map((m) => ({
+          name: m.name.trim(),
+          qty: Number(m.qty || 0),
+          unitCostCents: parseBRLToCents(m.unit),
+        }))
+        .filter((m) => m.name && m.qty > 0),
     };
+  }),
+};
 
     setLoading(true);
     try {
@@ -892,7 +921,10 @@ export default function OrcamentosPage() {
             {
               header: "Status",
               cell: (r) => (
-                <StatusPill tone={statusTone(r.status) as any} label={r.status} />
+                <StatusPill
+                  tone={budgetStatusTone(r.status) as any}
+                  label={budgetStatusLabel(r.status)}
+                />
               ),
             },
             { header: "Pagamento", cell: (r) => payLabel(r) },
@@ -900,7 +932,7 @@ export default function OrcamentosPage() {
             {
               header: "Total",
               className: "text-right font-extrabold",
-              cell: (r) => moneyBRLFromCents(r.totalCents || 0),
+              cell: (r) => moneyBRLFromCents(r.cashTotalCents || r.totalCents || 0),
             },
             {
               header: "Ações",
@@ -951,18 +983,17 @@ export default function OrcamentosPage() {
         maxWidth="max-w-[1240px]"
         footer={
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <Badge tone="brand">Total: {moneyBRLFromCents(calc.totalCliente)}</Badge>
-              {showCardFee ? (
-                <Badge tone="wood">
-                  Taxa cartão: {moneyBRLFromCents(calc.cardFeeCents)}
-                </Badge>
-              ) : null}
-              {form.paymentMode === "AVISTA" ? (
-                <Badge tone="ink">Desconto ativo</Badge>
-              ) : (
-                <Badge tone="neutral">Sem desconto</Badge>
-              )}
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="brand">Bruto: {moneyBRLFromCents(calc.grossTotalCents)}</Badge>
+              <Badge tone="ink">À vista: {moneyBRLFromCents(calc.cashTotalCents)}</Badge>
+              <Badge tone="wood">
+                {calc.installmentsCount}x de {moneyBRLFromCents(calc.installmentAmountCents)}
+              </Badge>
+                {showCardFee ? (
+                  <Badge tone="neutral">
+                    Taxa cartão: {moneyBRLFromCents(calc.cardFeeCents)}
+                  </Badge>
+                ) : null}
             </div>
             <div className="flex gap-2">
               <Button variant="soft" onClick={() => setOpen(false)}>
@@ -1078,236 +1109,194 @@ export default function OrcamentosPage() {
               </GlassCard>
 
               <GlassCard className="p-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <div className="font-display text-sm font-black text-[color:var(--ink)]">
-                      Pagamento
-                    </div>
-                    <div className="text-xs font-semibold text-[color:var(--muted)]">
-                      Desconto só à vista. Taxa cartão só parcelado + cartão.
-                    </div>
-                  </div>
-                  <Badge tone="wood">
-                    <CreditCard className="h-3.5 w-3.5" /> {form.paymentMode}
-                  </Badge>
-                </div>
+  <div className="flex flex-wrap items-center justify-between gap-2">
+    <div>
+      <div className="font-display text-sm font-black text-[color:var(--ink)]">
+        Condições do orçamento
+      </div>
+      <div className="text-xs font-semibold text-[color:var(--muted)]">
+        O orçamento envia à vista com desconto e parcelado com taxa juntos.
+      </div>
+    </div>
+    <Badge tone="wood">
+      <CreditCard className="h-3.5 w-3.5" /> À vista + Parcelado
+    </Badge>
+  </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <div>
-                    <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                      Modo
-                    </div>
-                    <Select
-                      value={form.paymentMode}
-                      onChange={(e) => {
-                        const v = e.target.value as PayMode;
-                        setForm((p) => ({
-                          ...p,
-                          paymentMode: v,
-                          ...(v === "PARCELADO"
-                            ? {
-                                discountType: "VALOR" as DiscountType,
-                                discount: "0,00",
-                                discountPreset: 0,
-                              }
-                            : {}),
-                        }));
-                      }}
-                    >
-                      <option value="AVISTA">À vista</option>
-                      <option value="PARCELADO">Parcelado</option>
-                    </Select>
-                  </div>
+  <div className="mt-3 grid gap-3 sm:grid-cols-2">
+    <div>
+      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+        Método do parcelado
+      </div>
+      <Select
+        value={form.paymentMethod}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, paymentMethod: e.target.value }))
+        }
+      >
+        <option value="CARTAO">CARTÃO</option>
+        <option value="PIX">PIX</option>
+        <option value="DINHEIRO">DINHEIRO</option>
+        <option value="BOLETO">BOLETO</option>
+      </Select>
+    </div>
 
-                  <div>
-                    <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                      Método
-                    </div>
-                    <Select
-                      value={form.paymentMethod}
-                      onChange={(e) =>
-                        setForm((p) => ({ ...p, paymentMethod: e.target.value }))
-                      }
-                    >
-                      <option value="">Selecione</option>
-                      <option value="PIX">PIX</option>
-                      <option value="DINHEIRO">DINHEIRO</option>
-                      <option value="CARTAO">CARTÃO</option>
-                      <option value="BOLETO">BOLETO</option>
-                    </Select>
-                  </div>
+    <div>
+  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+    Parcelas
+  </div>
+  <Select
+    value={String(form.installmentsCount)}
+    onChange={(e) =>
+      setForm((p) => ({
+        ...p,
+        installmentsCount: Number(e.target.value || 3),
+      }))
+    }
+  >
+    {Array.from({ length: 23 }, (_, i) => {
+      const n = i + 2;
+      return (
+        <option key={n} value={n}>
+          {n}x
+        </option>
+      );
+    })}
+  </Select>
+</div>
 
-                  {installmentsVisible ? (
-                    <div>
-                      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                        Parcelas
-                      </div>
-                      <Input
-                        value={String(form.installmentsCount)}
-                        onChange={(e) =>
-                          setForm((p) => ({
-                            ...p,
-                            installmentsCount: clamp(Number(e.target.value || 2), 2, 24),
-                          }))
-                        }
-                      />
-                    </div>
-                  ) : (
-                    <div className="sm:col-span-1 rounded-2xl border border-[color:var(--line)] bg-white/40 p-3 text-xs font-semibold text-[color:var(--muted)]">
-                      Desconto habilitado (à vista)
-                    </div>
-                  )}
+    <div>
+      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+        Taxa da maquininha (%)
+      </div>
+      <Input
+        value={form.cardFeePercent}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, cardFeePercent: e.target.value }))
+        }
+        placeholder="Ex: 12,30"
+      />
+    </div>
 
-                  {installmentsVisible &&
-                  String(form.paymentMethod).toUpperCase() === "CARTAO" ? (
-                    <div>
-                      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                        Taxa da maquininha (%)
-                      </div>
-                      <Input
-                        value={form.cardFeePercent}
-                        onChange={(e) =>
-                          setForm((p) => ({ ...p, cardFeePercent: e.target.value }))
-                        }
-                        placeholder="Ex: 12,30"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                        Tipo desconto
-                      </div>
-                      <Select
-                        value={form.discountType}
-                        disabled={!discountEnabled}
-                        onChange={(e) =>
-                          setForm((p) => ({
-                            ...p,
-                            discountType: e.target.value as DiscountType,
-                          }))
-                        }
-                      >
-                        <option value="VALOR">VALOR</option>
-                        <option value="PERCENT">PERCENT</option>
-                      </Select>
-                    </div>
-                  )}
+    <div>
+      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+        Tipo desconto à vista
+      </div>
+      <Select
+        value={form.discountType}
+        onChange={(e) =>
+          setForm((p) => ({
+            ...p,
+            discountType: e.target.value as DiscountType,
+          }))
+        }
+      >
+        <option value="VALOR">VALOR</option>
+        <option value="PERCENT">PERCENT</option>
+      </Select>
+    </div>
 
-                  {discountEnabled ? (
-                    form.discountType === "VALOR" ? (
-                      <div>
-                        <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                          Desconto (R$)
-                        </div>
-                        <Input
-                          value={form.discount}
-                          disabled={!discountEnabled}
-                          onChange={(e) =>
-                            setForm((p) => ({ ...p, discount: e.target.value }))
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <div>
-                        <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-                          Desconto (%)
-                        </div>
-                        <Select
-                          value={String(form.discountPreset)}
-                          disabled={!discountEnabled}
-                          onChange={(e) =>
-                            setForm((p) => ({
-                              ...p,
-                              discountPreset: Number(e.target.value || 0),
-                            }))
-                          }
-                        >
-                          <option value="0">0%</option>
-                          <option value="3">3%</option>
-                          <option value="5">5%</option>
-                          <option value="10">10%</option>
-                        </Select>
-                      </div>
-                    )
-                  ) : (
-                    <div className="rounded-2xl border border-[color:var(--line)] bg-white/40 p-3 text-xs font-semibold text-[color:var(--muted)]">
-                      No parcelado o desconto fica desativado.
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
+    {form.discountType === "VALOR" ? (
+      <div>
+        <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+          Desconto à vista (R$)
+        </div>
+        <Input
+          value={form.discount}
+          onChange={(e) =>
+            setForm((p) => ({ ...p, discount: e.target.value }))
+          }
+        />
+      </div>
+    ) : (
+     <div>
+  <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+    Desconto à vista (%)
+  </div>
+  <Input
+    value={String(form.discountPreset)}
+    onChange={(e) =>
+      setForm((p) => ({
+        ...p,
+        discountPreset: e.target.value,
+      }))
+    }
+    placeholder="Ex: 10 ou 12,5"
+  />
+</div>
+    )}
+
+    <div className="sm:col-span-2 rounded-2xl border border-[color:var(--line)] bg-white/40 p-3 text-xs font-semibold text-[color:var(--muted)]">
+      O valor bruto é a base comum. À vista aplica desconto. Parcelado aplica taxa.
+    </div>
+  </div>
+</GlassCard>
             </div>
 
             <div className="min-w-0 space-y-4">
               <GlassCard className="p-4">
-                <div className="font-display text-sm font-black text-[color:var(--ink)]">
-                  Resumo do orçamento
-                </div>
-                <div className="mt-3 space-y-2 text-sm font-semibold">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[color:var(--muted)]">Subtotal</span>
-                    <span className="font-extrabold text-[color:var(--ink)]">
-                      {moneyBRLFromCents(calc.totalBeforeDiscount)}
-                    </span>
-                  </div>
+  <div className="font-display text-sm font-black text-[color:var(--ink)]">
+    Resumo do orçamento
+  </div>
 
-                  {showCardFee ? (
-                    <div className="flex items-center justify-between">
-                      <span className="text-[color:var(--muted)]">
-                        Taxa cartão ({calc.cardFeePercent.toFixed(1)}%)
-                      </span>
-                      <span className="font-extrabold text-[color:var(--ink)]">
-                        {moneyBRLFromCents(calc.cardFeeCents)}
-                      </span>
-                    </div>
-                  ) : null}
+  <div className="mt-3 space-y-3 text-sm font-semibold">
+    <div className="flex items-center justify-between">
+      <span className="text-[color:var(--muted)]">Valor bruto</span>
+      <span className="font-extrabold text-[color:var(--ink)]">
+        {moneyBRLFromCents(calc.grossTotalCents)}
+      </span>
+    </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-[color:var(--muted)]">Desconto</span>
-                    <span className="font-extrabold text-[color:var(--ink)]">
-                      - {moneyBRLFromCents(calc.discountCents)}
-                    </span>
-                  </div>
+    <div className="rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
+      <div className="text-xs font-extrabold text-[color:var(--muted)]">
+        À vista
+      </div>
 
-                  <div className="h-px bg-black/10" />
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[color:var(--muted)]">Desconto</span>
+        <span className="font-extrabold text-[color:var(--ink)]">
+          - {moneyBRLFromCents(calc.discountCents)}
+        </span>
+      </div>
 
-                  <div className="flex items-center justify-between">
-                    <span className="text-[color:var(--muted)]">Total cliente</span>
-                    <span className="font-display text-xl font-black text-[color:var(--ink)]">
-                      {moneyBRLFromCents(calc.totalCliente)}
-                    </span>
-                  </div>
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[color:var(--muted)]">Total à vista</span>
+        <span className="font-display text-lg font-black text-[color:var(--ink)]">
+          {moneyBRLFromCents(calc.cashTotalCents)}
+        </span>
+      </div>
+    </div>
 
-                  {form.paymentMode === "PARCELADO" ? (
-                    <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
-                      <div className="text-xs font-extrabold text-[color:var(--muted)]">
-                        Parcelado
-                      </div>
-                      <div className="mt-1 font-extrabold text-[color:var(--ink)]">
-                        {clamp(Number(form.installmentsCount || 2), 2, 24)}x •{" "}
-                        {moneyBRLFromCents(
-                          Math.round(
-                            calc.totalCliente /
-                              clamp(Number(form.installmentsCount || 2), 2, 24)
-                          )
-                        )}
-                      </div>
-                      <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">
-                        (no PDF aparece total + parcelas)
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
-                      <div className="text-xs font-extrabold text-[color:var(--muted)]">
-                        À vista
-                      </div>
-                      <div className="mt-1 font-extrabold text-[color:var(--ink)]">
-                        {form.paymentMethod || "—"}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </GlassCard>
+    <div className="rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
+      <div className="text-xs font-extrabold text-[color:var(--muted)]">
+        Parcelado
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[color:var(--muted)]">
+          Taxa ({calc.cardFeePercent.toFixed(2)}%)
+        </span>
+        <span className="font-extrabold text-[color:var(--ink)]">
+          + {moneyBRLFromCents(calc.cardFeeCents)}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[color:var(--muted)]">Total parcelado</span>
+        <span className="font-display text-lg font-black text-[color:var(--ink)]">
+          {moneyBRLFromCents(calc.installmentTotalCents)}
+        </span>
+      </div>
+
+      <div className="mt-2 flex items-center justify-between">
+        <span className="text-[color:var(--muted)]">Parcelas</span>
+        <span className="font-extrabold text-[color:var(--ink)]">
+          {calc.installmentsCount}x de {moneyBRLFromCents(calc.installmentAmountCents)}
+        </span>
+      </div>
+    </div>
+  </div>
+</GlassCard>
 
               <GlassCard className="p-4">
                 <div className="font-display text-sm font-black text-[color:var(--ink)]">
@@ -1317,7 +1306,7 @@ export default function OrcamentosPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-[color:var(--muted)]">Custo materiais</span>
                     <span className="font-extrabold text-[color:var(--ink)]">
-                      {moneyBRLFromCents(calc.costItems)}
+                      {moneyBRLFromCents(calc.materialsCents)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
@@ -1329,20 +1318,20 @@ export default function OrcamentosPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-[color:var(--muted)]">Custo projeto</span>
                     <span className="font-extrabold text-[color:var(--ink)]">
-                      {moneyBRLFromCents(calc.projectCost)}
+                      {moneyBRLFromCents(calc.projectCostCents)}
                     </span>
                   </div>
                   <div className="h-px bg-black/10" />
                   <div className="flex items-center justify-between">
                     <span className="text-[color:var(--muted)]">Lucro</span>
                     <span className="font-extrabold text-[color:var(--ink)]">
-                      {moneyBRLFromCents(calc.profit)}
+                      {moneyBRLFromCents(calc.profitOnCashCents)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[color:var(--muted)]">Margem</span>
                     <span className="font-extrabold text-[color:var(--ink)]">
-                      {calc.margin.toFixed(1)}%
+                      {calc.marginOnCashPct.toFixed(1)}%
                     </span>
                   </div>
                   <div className="mt-2 rounded-2xl border border-[color:var(--line)] bg-white/45 p-3 text-xs font-semibold text-[color:var(--muted)]">
@@ -1376,20 +1365,19 @@ export default function OrcamentosPage() {
                 <div className="mt-3 min-w-0 overflow-hidden rounded-2xl border border-[color:var(--line)] bg-white/35">
                   <table className="w-full table-fixed text-sm">
                     <colgroup>
-                      {[
-                        "w-[18%]",
-                        "w-[22%]",
-                        "w-[8%]",
-                        "w-[12%]",
-                        "w-[14%]",
-                        "w-[11%]",
-                        "w-[11%]",
-                        "w-[4%]",
-                      ].map((c, i) => (
-                        <col key={i} className={c} />
-                      ))}
-                    </colgroup>
-
+  {[
+    "w-[16%]",
+    "w-[19%]",
+    "w-[8%]",
+    "w-[12%]",
+    "w-[15%]",
+    "w-[11%]",
+    "w-[11%]",
+    "w-[8%]",
+  ].map((c, i) => (
+    <col key={i} className={c} />
+  ))}
+</colgroup>
                     <thead className="bg-white/55">
                       <tr>
                         <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">

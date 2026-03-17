@@ -1,14 +1,29 @@
-export type UiStatusTone = "success" | "warning" | "danger" | "info" | "neutral" | "brand" | "wood";
+export type UiStatusTone =
+  | "success"
+  | "warning"
+  | "danger"
+  | "info"
+  | "neutral"
+  | "brand"
+  | "wood";
 
 function norm(value?: string | null) {
   return String(value || "").trim().toUpperCase();
 }
 
 function prettify(value?: string | null) {
-  const raw = String(value || "").trim().replaceAll("_", " ").toLowerCase();
+  const raw = String(value || "")
+    .trim()
+    .replaceAll("_", " ")
+    .toLowerCase();
+
   if (!raw) return "—";
   return raw.charAt(0).toUpperCase() + raw.slice(1);
 }
+
+/* =========================
+   PEDIDOS / VENDAS
+========================= */
 
 export function orderStatusLabel(status?: string | null) {
   switch (norm(status)) {
@@ -48,6 +63,47 @@ export function orderStatusTone(status?: string | null): UiStatusTone {
   }
 }
 
+/* =========================
+   ORÇAMENTOS
+========================= */
+
+export function budgetStatusLabel(status?: string | null) {
+  switch (norm(status)) {
+    case "RASCUNHO":
+      return "Rascunho";
+    case "ENVIADO":
+      return "Enviado";
+    case "APROVADO":
+      return "Aprovado";
+    case "CANCELADO":
+      return "Cancelado";
+    case "REJEITADO":
+      return "Rejeitado";
+    default:
+      return prettify(status);
+  }
+}
+
+export function budgetStatusTone(status?: string | null): UiStatusTone {
+  switch (norm(status)) {
+    case "APROVADO":
+      return "success";
+    case "ENVIADO":
+      return "warning";
+    case "CANCELADO":
+    case "REJEITADO":
+      return "danger";
+    case "RASCUNHO":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+}
+
+/* =========================
+   FINANCEIRO
+========================= */
+
 export function financeStatusLabel(status?: string | null) {
   switch (norm(status)) {
     case "PAGO":
@@ -81,16 +137,39 @@ export function financeStatusTone(status?: string | null): UiStatusTone {
     case "PARCIAL":
     case "PARTIAL":
       return "info";
-    case "CANCELADO":
-    case "CANCELLED":
-      return "neutral";
     case "ABERTO":
     case "OPEN":
       return "warning";
+    case "CANCELADO":
+    case "CANCELLED":
+      return "neutral";
     default:
       return "neutral";
   }
 }
+
+/* aliases semânticos
+   se depois quiser diferenciar recebível/pagável visualmente,
+   você muda só aqui */
+export function receivableStatusLabel(status?: string | null) {
+  return financeStatusLabel(status);
+}
+
+export function receivableStatusTone(status?: string | null): UiStatusTone {
+  return financeStatusTone(status);
+}
+
+export function payableStatusLabel(status?: string | null) {
+  return financeStatusLabel(status);
+}
+
+export function payableStatusTone(status?: string | null): UiStatusTone {
+  return financeStatusTone(status);
+}
+
+/* =========================
+   ORIGEM / RELATÓRIOS
+========================= */
 
 export function sourceLabel(source?: string | null) {
   const s = norm(source);

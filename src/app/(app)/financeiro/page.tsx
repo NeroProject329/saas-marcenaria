@@ -17,10 +17,18 @@ import GlassCard from "@/components/ui/GlassCard";
 import Badge from "@/components/ui/Badge";
 import WaveMiniCard from "@/components/charts/WaveMiniCard";
 
+
 import { useGsapStagger } from "@/motion/useGsapStagger";
 import { moneyBRLFromCents, isoToBR, isoToDateInput, parseBRLToCents, dateInputToISO } from "@/lib/format";
 import type { FinanceCategory, FinanceTransaction, Payable, Receivable } from "@/lib/types";
-import { financeStatusLabel, sourceLabel, sourceTone } from "@/lib/status";
+
+import {
+  financeStatusLabel,
+  payableStatusTone,
+  receivableStatusTone,
+  sourceLabel,
+  sourceTone,
+} from "@/lib/status";
 
 import {
   getCashflowByRange,
@@ -52,58 +60,16 @@ function tabAccent(tab: Tab) {
   }
 }
 
-function normalizeStatus(value?: string | null) {
-  return String(value || "").trim().toUpperCase();
-}
+
 
 function canManageTransaction(tx?: FinanceTransaction | null) {
   const source = String(tx?.source || "").trim().toUpperCase();
   return !source || source === "MANUAL" || source === "MANUAL_ENTRY" || source === "MANUAL_TRANSACTION";
 }
 
-function receivableStatusTone(status?: string | null) {
-  switch (normalizeStatus(status)) {
-    case "PAGO":
-    case "PAID":
-      return "success";
-    case "ABERTO":
-    case "OPEN":
-      return "brand";
-    case "PARCIAL":
-    case "PARTIAL":
-      return "warning";
-    case "VENCIDO":
-    case "OVERDUE":
-      return "danger";
-    case "CANCELADO":
-    case "CANCELLED":
-      return "neutral";
-    default:
-      return "brand";
-  }
-}
 
-function payableStatusTone(status?: string | null) {
-  switch (normalizeStatus(status)) {
-    case "PAGO":
-    case "PAID":
-      return "success";
-    case "ABERTO":
-    case "OPEN":
-      return "wood";
-    case "PARCIAL":
-    case "PARTIAL":
-      return "info";
-    case "VENCIDO":
-    case "OVERDUE":
-      return "danger";
-    case "CANCELADO":
-    case "CANCELLED":
-      return "neutral";
-    default:
-      return "wood";
-  }
-}
+
+
 
 export default function FinanceiroPage() {
   const wrapRef = useRef<HTMLDivElement | null>(null);

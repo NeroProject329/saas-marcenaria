@@ -106,32 +106,34 @@ export type BudgetItem = {
 
 export type Budget = {
   id: string;
-  clientId: string;
-  clientName?: string;
-  status: BudgetStatus;
-
+  status: "RASCUNHO" | "ENVIADO" | "APROVADO" | "REJEITADO" | "CANCELADO";
   createdAt: string;
+  updatedAt: string;
   expectedDeliveryAt?: string | null;
 
-  notes?: string | null;
-
+  subtotalCents: number;
   discountCents: number;
-  discountType?: "NONE" | "FIXED" | "PERCENT";
-  discountPercent?: number | null;
+  totalCents: number;
 
-  deliveryDays: number; // dias fabricação
-  dailyRateCents: number;
+  grossTotalCents: number;
+  cashTotalCents: number;
+  installmentTotalCents: number;
+  installmentAmountCents: number;
 
-  paymentMode: PaymentMode;
-  paymentMethod?: PaymentMethod | null;
+  paymentMode: "AVISTA" | "PARCELADO";
+  paymentMethod?: "PIX" | "CARTAO" | "DINHEIRO" | "BOLETO" | "TRANSFERENCIA" | "OUTRO" | null;
   installmentsCount: number;
   firstDueDate?: string | null;
 
-  profitPercent: number;
-  cardFeePercent: number;
+  approvedAt?: string | null;
+  approvedOrderId?: string | null;
 
-  totalCents: number;
-  items: BudgetItem[];
+  client: {
+    id: string;
+    name: string;
+    phone: string;
+    type: "CLIENTE" | "FORNECEDOR" | "BOTH";
+  };
 };
 
 export type FinanceCategory = {

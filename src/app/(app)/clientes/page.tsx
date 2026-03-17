@@ -16,6 +16,13 @@ import Modal from "@/components/ui/Modal";
 import StatusPill from "@/components/ui/StatusPill";
 import KpiCard from "@/components/ui/KpiCard";
 
+import {
+  budgetStatusLabel,
+  budgetStatusTone,
+  orderStatusLabel,
+  orderStatusTone,
+} from "@/lib/status";
+
 import { useGsapStagger } from "@/motion/useGsapStagger";
 import type { Client } from "@/lib/types";
 import { moneyBRLFromCents, isoToBR } from "@/lib/format";
@@ -502,7 +509,15 @@ export default function ClientesPage() {
                 rowKey={(r: any, i: number) => r?.id || `o_${i}`}
                 columns={[
                   { header: "Criado", cell: (r: any) => isoToBR(r.createdAt) },
-                  { header: "Status", cell: (r: any) => <StatusPill tone="neutral" label={String(r.status || "-")} /> },
+                  {
+  header: "Status",
+  cell: (r: any) => (
+    <StatusPill
+      tone={orderStatusTone(r.status) as any}
+      label={orderStatusLabel(r.status)}
+    />
+  ),
+},
                   { header: "Pagamento", cell: (r: any) => paymentLabel(r) },
                   { header: "Entrega", cell: (r: any) => isoToBR(r.expectedDeliveryAt) },
                   {
@@ -529,7 +544,15 @@ export default function ClientesPage() {
                 rowKey={(r: any, i: number) => r?.id || `b_${i}`}
                 columns={[
                   { header: "Criado", cell: (r: any) => isoToBR(r.createdAt) },
-                  { header: "Status", cell: (r: any) => <StatusPill tone="brand" label={String(r.status || "-")} /> },
+                 {
+  header: "Status",
+  cell: (r: any) => (
+    <StatusPill
+      tone={budgetStatusTone(r.status) as any}
+      label={budgetStatusLabel(r.status)}
+    />
+  ),
+},
                   { header: "Pagamento", cell: (r: any) => paymentLabel(r) },
                   { header: "Entrega", cell: (r: any) => isoToBR(r.expectedDeliveryAt) },
                   {

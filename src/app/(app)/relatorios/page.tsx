@@ -15,11 +15,27 @@ import StatusPill from "@/components/ui/StatusPill";
 import { useGsapStagger } from "@/motion/useGsapStagger";
 import { moneyBRLFromCents, isoToBR } from "@/lib/format";
 import { financeStatusLabel, financeStatusTone, orderStatusLabel, orderStatusTone, reportBasisLabel } from "@/lib/status";
-import { getReportPack, downloadReportPackPdf } from "@/services/reports.service";
+import {
+  getReportPack,
+  downloadReportPackPdf,
+  downloadSalesHistoryPdf,
+} from "@/services/reports.service";
 import { listOrders } from "@/services/orders.service";
 import type { Order } from "@/lib/types";
 
 type Tab = "summary" | "cash" | "overdue" | "tx" | "sales";
+
+type SalesStatusFilter = "ALL" | Order["status"];
+
+const SALES_STATUS_OPTIONS: Array<{ value: SalesStatusFilter; label: string }> = [
+  { value: "ALL", label: "Todos" },
+  { value: "ORCAMENTO", label: "Orçamento" },
+  { value: "PEDIDO", label: "Pedido" },
+  { value: "EM_PRODUCAO", label: "Em produção" },
+  { value: "PRONTO", label: "Pronto" },
+  { value: "ENTREGUE", label: "Entregue" },
+  { value: "CANCELADO", label: "Cancelado" },
+];
 
 function monthNow() {
   const d = new Date();
@@ -67,6 +83,8 @@ export default function RelatoriosPage() {
   const [month, setMonth] = useState(monthNow());
   const [basis, setBasis] = useState<"due" | "paid">("due");
 
+  const [salesStatus, setSalesStatus] = useState<SalesStatusFilter>("ALL");
+
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [pack, setPack] = useState<any>(null);
@@ -106,6 +124,23 @@ export default function RelatoriosPage() {
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   }
 
+  async function onSalesPdf() {
+    const blob = await downloadSalesHistoryPdf({ month, status: salesStatus });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const safeStatus = salesStatus === "ALL" ? "TODOS" : salesStatus;
+
+    a.href = url;
+    a.download = `Historico_Vendas_${month}_${safeStatus}.pdf`;
+
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
   const summary = pack?.summary || {};
   const dre = pack?.dre || {};
   const dfcReal = pack?.dfc?.real || {};
@@ -114,13 +149,14 @@ export default function RelatoriosPage() {
   const overdue = pack?.overdue || {};
   const lastTx = pack?.lastTransactions || [];
 
-  const salesRows = useMemo(() => {
-    return (orders || [])
-      .filter((order) => order.status !== "ORCAMENTO")
-      .filter((order) => isInMonth(order.createdAt, month) || isInMonth(order.expectedDeliveryAt || null, month))
-      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-  }, [orders, month]);
+const salesRows = useMemo(() => {
+  return (orders || [])
+    .filter((order) => isInMonth(order.createdAt, month) || isInMonth(order.expectedDeliveryAt || null, month))
+    .filter((order) => (salesStatus === "ALL" ? true : order.status === salesStatus))
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+}, [orders, month, salesStatus]);
 
+const salesStatusLabel = salesStatus === "ALL" ? "Todos" : orderStatusLabel(salesStatus);
   const salesTotalCents = useMemo(
     () => salesRows.reduce((acc, order) => acc + (Number(order.totalCents) || 0), 0),
     [salesRows]
@@ -131,7 +167,7 @@ export default function RelatoriosPage() {
       <div data-stagger>
         <PageHeader
           title="Relatórios"
-          subtitle="Resumo financeiro, DRE, DFC, vencidos, últimas transações e histórico de vendas."
+          subtitle="Resumo financeiro, DRE, DFC, vencidos, últimas transações e vendas entregues no PDF completo."
           badge={{ label: "Gestão", tone: "brand" }}
           right={
             <div className="flex flex-wrap items-center gap-2">
@@ -155,7 +191,7 @@ export default function RelatoriosPage() {
                 <RefreshCw className="h-4 w-4" /> Atualizar
               </Button>
               <Button variant="dark" onClick={onPdf}>
-                <Download className="h-4 w-4" /> Baixar PDF
+                <Download className="h-4 w-4" /> Baixar PDF completo
               </Button>
             </div>
           }
@@ -327,37 +363,76 @@ export default function RelatoriosPage() {
       ) : null}
 
       {tab === "sales" ? (
-        <div className="space-y-3" data-stagger>
-          <div className="grid gap-3 md:grid-cols-3">
-            <GlassCard className="p-4">
-              <div className="text-xs font-extrabold text-[color:var(--muted)]">Vendas no período</div>
-              <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">{salesRows.length}</div>
-              <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Pedidos criados ou com entrega no mês</div>
-            </GlassCard>
-
-            <GlassCard className="p-4 md:col-span-2">
-              <div className="text-xs font-extrabold text-[color:var(--muted)]">Total vendido no período</div>
-              <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">{moneyBRLFromCents(salesTotalCents)}</div>
-              <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">Histórico consolidado das vendas cadastradas no sistema</div>
-            </GlassCard>
+  <div className="space-y-3" data-stagger>
+    <GlassCard className="p-4">
+      <div className="grid gap-3 lg:grid-cols-[240px_1fr_auto] lg:items-end">
+        <div>
+          <div className="text-xs font-extrabold text-[color:var(--muted)]">Filtrar por status</div>
+          <div className="mt-2">
+            <Select value={salesStatus} onChange={(e) => setSalesStatus(e.target.value as SalesStatusFilter)}>
+              {SALES_STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
           </div>
-
-          <DataTable
-            title="Histórico de vendas"
-            subtitle={`Pedidos do mês ${month}`}
-            rows={salesRows}
-            rowKey={(r) => r.id}
-            columns={[
-              { header: "Criado em", cell: (r) => isoToBR(r.createdAt) },
-              { header: "Cliente", cell: (r) => r.clientName || "—" },
-              { header: "Status", cell: (r) => <StatusPill tone={orderStatusTone(r.status) as any} label={orderStatusLabel(r.status)} /> },
-              { header: "Entrega prevista", cell: (r) => isoToBR(r.expectedDeliveryAt || null) },
-              { header: "Pagamento", cell: (r) => paymentLabel(r) },
-              { header: "Valor", className: "text-right font-extrabold", cell: (r) => moneyBRLFromCents(r.totalCents || 0) },
-            ]}
-          />
         </div>
-      ) : null}
+
+        <div className="text-sm font-semibold text-[color:var(--muted)]">
+          Exibindo vendas do mês <span className="font-black text-[color:var(--ink)]">{month}</span> com filtro{" "}
+          <span className="font-black text-[color:var(--ink)]">{salesStatusLabel}</span>.
+        </div>
+
+        <div className="lg:justify-self-end">
+          <Button variant="soft" onClick={onSalesPdf}>
+            <Download className="h-4 w-4" /> Baixar PDF do histórico
+          </Button>
+        </div>
+      </div>
+    </GlassCard>
+
+    <div className="grid gap-3 md:grid-cols-3">
+      <GlassCard className="p-4">
+        <div className="text-xs font-extrabold text-[color:var(--muted)]">Vendas no período</div>
+        <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">{salesRows.length}</div>
+        <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">
+          Registros do mês com filtro: {salesStatusLabel}
+        </div>
+      </GlassCard>
+
+      <GlassCard className="p-4 md:col-span-2">
+        <div className="text-xs font-extrabold text-[color:var(--muted)]">Total vendido no período</div>
+        <div className="mt-2 font-display text-2xl font-black text-[color:var(--ink)]">
+          {moneyBRLFromCents(salesTotalCents)}
+        </div>
+        <div className="mt-1 text-xs font-semibold text-[color:var(--muted)]">
+          Soma dos pedidos/orçamentos visíveis com o filtro atual
+        </div>
+      </GlassCard>
+    </div>
+
+    <DataTable
+      title="Histórico de vendas"
+      subtitle={`Pedidos do mês ${month} • Status: ${salesStatusLabel}`}
+      rows={salesRows}
+      rowKey={(r) => r.id}
+      columns={[
+        { header: "Criado em", cell: (r) => isoToBR(r.createdAt) },
+        { header: "Cliente", cell: (r) => r.clientName || "—" },
+        {
+          header: "Status",
+          cell: (r) => (
+            <StatusPill tone={orderStatusTone(r.status) as any} label={orderStatusLabel(r.status)} />
+          ),
+        },
+        { header: "Entrega prevista", cell: (r) => isoToBR(r.expectedDeliveryAt || null) },
+        { header: "Pagamento", cell: (r) => paymentLabel(r) },
+        { header: "Valor", className: "text-right font-extrabold", cell: (r) => moneyBRLFromCents(r.totalCents || 0) },
+      ]}
+    />
+  </div>
+) : null}
     </div>
   );
 }

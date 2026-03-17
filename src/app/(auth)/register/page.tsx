@@ -6,6 +6,7 @@ import GlassCard from "@/components/ui/GlassCard";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import GoogleButton from "@/components/auth/GoogleButton";
 import { useAuth } from "@/auth/AuthProvider";
 
 function RegisterInner() {
@@ -20,6 +21,7 @@ function RegisterInner() {
   }, [sp]);
 
   const [name, setName] = useState("");
+  const [salonName, setSalonName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [pass2, setPass2] = useState("");
@@ -35,13 +37,19 @@ function RegisterInner() {
     setErr(null);
 
     if (!name.trim()) return setErr("Informe seu nome.");
+    if (!salonName.trim()) return setErr("Informe o nome da marcenaria.");
     if (!email.trim()) return setErr("Informe seu e-mail.");
     if (pass.length < 6) return setErr("A senha precisa ter no mínimo 6 caracteres.");
     if (pass !== pass2) return setErr("As senhas não conferem.");
 
     setPending(true);
     try {
-      await register({ name: name.trim(), email: email.trim(), password: pass });
+      await register({
+        name: name.trim(),
+        salonName: salonName.trim(),
+        email: email.trim(),
+        password: pass,
+      });
       router.replace(next);
     } catch (e: any) {
       setErr(e?.message || "Falha no cadastro.");
@@ -65,22 +73,50 @@ function RegisterInner() {
       <form onSubmit={onSubmit} className="mt-5 space-y-3">
         <div>
           <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Nome</div>
-          <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Seu nome" />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Seu nome"
+          />
+        </div>
+
+        <div>
+          <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Nome da marcenaria</div>
+          <Input
+            value={salonName}
+            onChange={(e) => setSalonName(e.target.value)}
+            placeholder="Ex.: Marcenaria Silva"
+          />
         </div>
 
         <div>
           <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">E-mail</div>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seuemail@..." />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seuemail@..."
+          />
         </div>
 
         <div className="grid gap-3 sm:grid-cols-2">
           <div>
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Senha</div>
-            <Input type="password" value={pass} onChange={(e) => setPass(e.target.value)} placeholder="••••••••" />
+            <Input
+              type="password"
+              value={pass}
+              onChange={(e) => setPass(e.target.value)}
+              placeholder="••••••••"
+            />
           </div>
           <div>
             <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Confirmar</div>
-            <Input type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} placeholder="••••••••" />
+            <Input
+              type="password"
+              value={pass2}
+              onChange={(e) => setPass2(e.target.value)}
+              placeholder="••••••••"
+            />
           </div>
         </div>
 
@@ -103,6 +139,10 @@ function RegisterInner() {
           Já tenho conta
         </Button>
       </form>
+
+      <div className="mt-4">
+        <GoogleButton next={next} />
+      </div>
     </GlassCard>
   );
 }

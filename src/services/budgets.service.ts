@@ -28,11 +28,20 @@ export type Budget = {
   client: { id: string; name: string; phone?: string | null } | null;
 
   createdAt: string;
+  updatedAt: string;
   expectedDeliveryAt: string | null;
 
   paymentMode: PayMode;
-  paymentMethod: string | null;
+  paymentMethod:
+    | "PIX"
+    | "CARTAO"
+    | "DINHEIRO"
+    | "BOLETO"
+    | "TRANSFERENCIA"
+    | "OUTRO"
+    | null;
   installmentsCount: number | null;
+  firstDueDate: string | null;
 
   deliveryDays: number;
   dailyRateCents: number;
@@ -44,9 +53,18 @@ export type Budget = {
   discountCents: number;
   discountPercent: number | null;
 
-  notes: string | null;
-
+  subtotalCents: number;
   totalCents: number;
+
+  grossTotalCents: number;
+  cashTotalCents: number;
+  installmentTotalCents: number;
+  installmentAmountCents: number;
+
+  approvedAt: string | null;
+  approvedOrderId: string | null;
+
+  notes: string | null;
 
   items: BudgetItem[];
 };
@@ -77,17 +95,27 @@ function normalizeBudget(b: any): Budget {
 
   return {
     id: b.id,
-    status: String(b.status || "RASCUNHO").toUpperCase(),
+    status: String(b.status || "RASCUNHO").toUpperCase() as BudgetStatus,
 
     clientId: b.clientId,
     client,
 
     createdAt: b.createdAt ?? new Date().toISOString(),
+    updatedAt: b.updatedAt ?? b.createdAt ?? new Date().toISOString(),
     expectedDeliveryAt: b.expectedDeliveryAt ?? null,
 
-    paymentMode: (b.paymentMode ?? "AVISTA").toUpperCase(),
-    paymentMethod: b.paymentMethod ?? null,
+    paymentMode: (b.paymentMode ?? "AVISTA").toUpperCase() as PayMode,
+    paymentMethod:
+  b.paymentMethod === "PIX" ||
+  b.paymentMethod === "CARTAO" ||
+  b.paymentMethod === "DINHEIRO" ||
+  b.paymentMethod === "BOLETO" ||
+  b.paymentMethod === "TRANSFERENCIA" ||
+  b.paymentMethod === "OUTRO"
+    ? b.paymentMethod
+    : null,
     installmentsCount: b.installmentsCount ?? null,
+    firstDueDate: b.firstDueDate ?? null,
 
     deliveryDays: n(b.deliveryDays, 0),
     dailyRateCents: n(b.dailyRateCents, 0),
@@ -95,44 +123,67 @@ function normalizeBudget(b: any): Budget {
     profitPercent: b.profitPercent ?? null,
     cardFeePercent: b.cardFeePercent ?? null,
 
-    discountType: (b.discountType ?? "VALOR").toUpperCase(),
+    discountType: (b.discountType ?? "VALOR").toUpperCase() as DiscountType,
     discountCents: n(b.discountCents, 0),
     discountPercent: b.discountPercent ?? null,
 
-    notes: b.notes ?? null,
-
+    subtotalCents: n(b.subtotalCents, 0),
     totalCents: n(b.totalCents, 0),
 
+    grossTotalCents: n(b.grossTotalCents, 0),
+    cashTotalCents: n(b.cashTotalCents, 0),
+    installmentTotalCents: n(b.installmentTotalCents, 0),
+    installmentAmountCents: n(b.installmentAmountCents, 0),
+
+    approvedAt: b.approvedAt ?? null,
+    approvedOrderId: b.approvedOrderId ?? null,
+
+    notes: b.notes ?? null,
+
     items,
-  } as any;
+  };
 }
 
 export type SaveBudgetPayload = {
   clientId: string;
-  expectedDeliveryAt: string | null;
-  notes: string;
+  expectedDeliveryAt?: string | null;
+  notes?: string | null;
 
-  discountCents: number;
-  discountType: DiscountType;
-  discountPercent: number | null;
+  deliveryDays?: number | null;
+  dailyRateCents?: number | null;
 
-  deliveryDays: number;
-  dailyRateCents: number;
+  discountType?: "VALOR" | "PERCENT";
+  discountPercent?: number;
+  discountCents?: number;
 
-  paymentMode: PayMode;
-  paymentMethod: string | null;
-  installmentsCount: number;
-  firstDueDate: string | null;
+  paymentMode?: "AVISTA" | "PARCELADO";
+  paymentMethod?: "PIX" | "CARTAO" | "DINHEIRO" | "BOLETO" | "TRANSFERENCIA" | "OUTRO" | null;
+  installmentsCount?: number;
+  firstDueDate?: string | null;
+  installments?: Array<{
+    dueDate: string;
+    amountCents: number;
+  }>;
 
-  profitPercent: number;
-  cardFeePercent: number;
+  cardFeePercent?: number;
+
+  extras?: Array<{
+    name: string;
+    amountCents: number;
+  }>;
+
+  profitPercent?: number;
 
   items: Array<{
     name: string;
-    description: string | null;
+    description?: string | null;
     quantity: number;
-    unitPriceCents: number;
-    materials: Array<{ name: string; qty: number; unitCostCents: number }>;
+    unitPriceCents?: number;
+    materials?: Array<{
+      name: string;
+      qty: number;
+      unitCostCents: number;
+    }>;
   }>;
 };
 

@@ -6,6 +6,7 @@ import GlassCard from "@/components/ui/GlassCard";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import Badge from "@/components/ui/Badge";
+import GoogleButton from "@/components/auth/GoogleButton";
 import { useAuth } from "@/auth/AuthProvider";
 
 function LoginInner() {
@@ -13,7 +14,6 @@ function LoginInner() {
   const router = useRouter();
   const sp = useSearchParams();
 
-  // ✅ useSearchParams precisa estar abaixo de um <Suspense>
   const next = useMemo(() => {
     const raw = sp.get("next") || "/dashboard";
     if (raw.startsWith("/login") || raw.startsWith("/register")) return "/dashboard";
@@ -33,6 +33,7 @@ function LoginInner() {
     e.preventDefault();
     setErr(null);
     setPending(true);
+
     try {
       await login(email.trim(), password);
       router.replace(next);
@@ -58,7 +59,12 @@ function LoginInner() {
       <form onSubmit={onSubmit} className="mt-5 space-y-3">
         <div>
           <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">E-mail</div>
-          <Input value={email} onChange={(e) => setEmail(e.target.value)} placeholder="seuemail@..." />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="seuemail@..."
+          />
         </div>
 
         <div>
@@ -90,6 +96,10 @@ function LoginInner() {
           Criar conta
         </Button>
       </form>
+
+      <div className="mt-4">
+        <GoogleButton next={next} />
+      </div>
     </GlassCard>
   );
 }

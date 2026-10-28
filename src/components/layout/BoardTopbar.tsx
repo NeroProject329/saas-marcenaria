@@ -39,6 +39,7 @@ export default function BoardTopbar() {
       {/* center tabs (scroll se precisar) */}
       <div className="max-w-[52vw] overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <Segmented
+          outlined
           items={TOP.map((t) => ({ key: t.key, label: t.label }))}
           value={current}
           onChange={(key) => {

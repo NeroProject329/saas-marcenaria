@@ -155,6 +155,8 @@ export default function EstoquePage() {
     unit: "",
     isActive: true,
     defaultUnit: "",
+    saleMargin: "40",
+    salePrice: "",
   });
 
   // supplier prices draft
@@ -162,7 +164,7 @@ export default function EstoquePage() {
 
   function openNewMaterial() {
     setMatEditing(null);
-    setMatForm({ name: "", unit: "", isActive: true, defaultUnit: "" });
+    setMatForm({ name: "", unit: "", isActive: true, defaultUnit: "", saleMargin: "40", salePrice: "" });
     setMatSuppliers([]);
     setMatOpen(true);
   }
@@ -177,6 +179,8 @@ export default function EstoquePage() {
         unit: full.unit || "",
         isActive: full.isActive !== false,
         defaultUnit: full.defaultUnitCostCents ? String((full.defaultUnitCostCents / 100).toFixed(2)).replace(".", ",") : "",
+        saleMargin: String(full.saleMarginPercent || 0).replace(".", ","),
+        salePrice: full.salePriceCents ? String((full.salePriceCents / 100).toFixed(2)).replace(".", ",") : "",
       });
       setMatSuppliers(
         (full.supplierPrices || []).map((x) => ({
@@ -195,6 +199,10 @@ export default function EstoquePage() {
     if (name.length < 2) return alert("Nome inválido.");
 
     const defaultUnitCostCents = matForm.defaultUnit ? parseBRLToCents(matForm.defaultUnit) : null;
+    const saleMarginPercent = Math.max(0, Number(String(matForm.saleMargin || "0").replace(",", ".")) || 0);
+    const salePriceCents = matForm.salePrice
+      ? parseBRLToCents(matForm.salePrice)
+      : Math.round(Number(defaultUnitCostCents || 0) * (1 + saleMarginPercent / 100));
 
     const suppliersPayload = matSuppliers
       .filter((s) => s.supplierId && parseBRLToCents(s.unit) > 0)
@@ -208,6 +216,8 @@ export default function EstoquePage() {
           unit: matForm.unit.trim() || null,
           isActive: !!matForm.isActive,
           defaultUnitCostCents,
+          saleMarginPercent,
+          salePriceCents,
           suppliers: suppliersPayload,
         });
       } else {
@@ -216,6 +226,8 @@ export default function EstoquePage() {
           unit: matForm.unit.trim() || null,
           isActive: !!matForm.isActive,
           defaultUnitCostCents,
+          saleMarginPercent,
+          salePriceCents,
           suppliers: suppliersPayload,
         });
       }
@@ -504,6 +516,8 @@ export default function EstoquePage() {
               { header: "Ativo", cell: (r: Material) => <StatusPill tone={r.isActive ? "success" : "neutral"} label={r.isActive ? "Ativo" : "Inativo"} /> },
               { header: "Melhor fornecedor", cell: (r: Material) => r.bestSupplier?.name || "—" },
               { header: "Melhor preço", className: "text-right font-extrabold", cell: (r: Material) => (r.bestSupplier ? moneyBRLFromCents(r.bestSupplier.unitCostCents) : "—") },
+              { header: "Margem", className: "text-right font-extrabold", cell: (r: Material) => `${r.saleMarginPercent.toFixed(1)}%` },
+              { header: "Venda", className: "text-right font-extrabold", cell: (r: Material) => moneyBRLFromCents(r.salePriceCents) },
               {
                 header: "Ações",
                 className: "text-right",
@@ -603,7 +617,53 @@ export default function EstoquePage() {
 
             <div>
               <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Custo padrão (R$)</div>
-              <Input value={matForm.defaultUnit} onChange={(e) => setMatForm((p) => ({ ...p, defaultUnit: e.target.value }))} placeholder="0,00" />
+              <Input
+                value={matForm.defaultUnit}
+                onChange={(e) => {
+                  const defaultUnit = e.target.value;
+                  setMatForm((p) => {
+                    const cost = parseBRLToCents(defaultUnit);
+                    const margin = Number(String(p.saleMargin || "0").replace(",", ".")) || 0;
+                    const sale = Math.round(cost * (1 + margin / 100));
+                    return { ...p, defaultUnit, salePrice: cost > 0 ? String((sale / 100).toFixed(2)).replace(".", ",") : "" };
+                  });
+                }}
+                placeholder="0,00"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Margem de venda (%)</div>
+              <Input
+                value={matForm.saleMargin}
+                onChange={(e) => {
+                  const saleMargin = e.target.value;
+                  setMatForm((p) => {
+                    const cost = parseBRLToCents(p.defaultUnit);
+                    const margin = Number(String(saleMargin || "0").replace(",", ".")) || 0;
+                    const sale = Math.round(cost * (1 + margin / 100));
+                    return { ...p, saleMargin, salePrice: cost > 0 ? String((sale / 100).toFixed(2)).replace(".", ",") : p.salePrice };
+                  });
+                }}
+                placeholder="40"
+              />
+            </div>
+
+            <div>
+              <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">Valor de venda (R$)</div>
+              <Input
+                value={matForm.salePrice}
+                onChange={(e) => {
+                  const salePrice = e.target.value;
+                  setMatForm((p) => {
+                    const cost = parseBRLToCents(p.defaultUnit);
+                    const sale = parseBRLToCents(salePrice);
+                    const margin = cost > 0 ? ((sale / cost - 1) * 100) : 0;
+                    return { ...p, salePrice, saleMargin: margin >= 0 ? margin.toFixed(2).replace(".", ",") : p.saleMargin };
+                  });
+                }}
+                placeholder="140,00"
+              />
             </div>
 
             <div className="sm:col-span-2 flex items-center gap-2">

@@ -56,6 +56,7 @@ import {
   updateOrderFull,
   cancelOrder,
   deleteOrder,
+  downloadOrderReceipt,
   SaveOrderPayload,
 } from "@/services/orders.service";
 import { orderStatusLabel, orderStatusTone } from "@/lib/status";
@@ -402,6 +403,23 @@ export default function VendasPage() {
     }
   }
 
+  async function onReceipt(id: string) {
+    setLoading(true);
+    try {
+      const blob = await downloadOrderReceipt(id);
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `comprovante-pedido-${id.slice(-6).toUpperCase()}.pdf`;
+      anchor.click();
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e: any) {
+      alert(e?.message || "Erro ao gerar comprovante.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function onDeleteOrder(id: string) {
     const ok = confirm("Excluir este pedido? (não pode desfazer)");
     if (!ok) return;
@@ -584,6 +602,9 @@ export default function VendasPage() {
               className: "text-right",
               cell: (r) => (
                 <div className="flex justify-end gap-2">
+                  <Button variant="soft" onClick={() => onReceipt(r.id)}>
+                    <FileText className="h-4 w-4" /> Comprovante
+                  </Button>
                   <Button
                     variant="soft"
                     className="border-[rgba(59,130,246,0.18)] bg-[rgba(59,130,246,0.10)] text-[color:var(--ink)] hover:bg-[rgba(59,130,246,0.16)]"
@@ -951,8 +972,8 @@ export default function VendasPage() {
                 </div>
 
                 <div className="mt-4 grid gap-2">
-                  <Button variant="soft" onClick={() => {}}>
-                    <FileText className="h-4 w-4" /> Gerar comprovante (placeholder)
+                  <Button variant="primary" onClick={() => editing && onReceipt(editing.id)} disabled={!editing}>
+                    <FileText className="h-4 w-4" /> {editing ? "Baixar comprovante" : "Salve o pedido para gerar"}
                   </Button>
                   <Button variant="ghost" onClick={() => {}}>
                     Histórico (placeholder)

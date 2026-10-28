@@ -50,7 +50,7 @@ function LoginInner() {
         <div>
           <div className="font-display text-2xl font-black text-[color:var(--ink)]">Entrar</div>
           <div className="mt-1 text-sm font-semibold text-[color:var(--muted)]">
-            Acesse seu painel premium.
+            Entre e continue o trabalho da sua oficina.
           </div>
         </div>
         <Badge tone="brand">Marcenaria</Badge>

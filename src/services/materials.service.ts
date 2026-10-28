@@ -7,6 +7,8 @@ export type Material = {
   isActive: boolean;
 
   defaultUnitCostCents: number | null;
+  saleMarginPercent: number;
+  salePriceCents: number;
 
   bestSupplier?: { id: string; name: string; unitCostCents: number } | null;
   supplierPrices?: Array<{ supplierId: string; supplierName: string; unitCostCents: number }>;
@@ -49,6 +51,8 @@ function normalizeMaterial(m: any): Material {
     unit: m.unit ?? null,
     isActive: m.isActive !== false,
     defaultUnitCostCents: m.defaultUnitCostCents ?? m.defaultUnitCost ?? null,
+    saleMarginPercent: Number(m.saleMarginPercent ?? 0) || 0,
+    salePriceCents: Number(m.salePriceCents ?? m.defaultUnitCostCents ?? 0) || 0,
     bestSupplier: best
       ? {
           id: best.supplierId ?? best.id,
@@ -122,6 +126,8 @@ export type SaveMaterialPayload = {
   unit?: string | null;
   isActive?: boolean;
   defaultUnitCostCents?: number | null;
+  saleMarginPercent?: number;
+  salePriceCents?: number;
   suppliers?: Array<{ supplierId: string; unitCostCents: number }>;
 };
 

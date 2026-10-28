@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Plus, ArrowDownCircle, ArrowUpCircle, Tags, Wallet } from "lucide-react";
+import { ArrowDownCircle, ArrowUpCircle, Tags, Wallet } from "lucide-react";
 
 import PageHeader from "@/components/layout/PageHeader";
 import Tabs from "@/components/ui/Tabs";
@@ -203,6 +203,7 @@ export default function FinanceiroPage() {
   }
 
   function openNewTx(type: "IN" | "OUT") {
+    listCategories().then(setCategories).catch(() => undefined);
     setTxEditing(null);
     setTxForm({
       type,
@@ -421,23 +422,19 @@ export default function FinanceiroPage() {
             )
           }
           right={
-            tab === "transactions" ? (
-              <>
+            <>
+              {tab === "transactions" ? (
                 <Button variant="soft" onClick={() => setCatOpen(true)}>
                   <Tags className="h-4 w-4" /> Categoria
                 </Button>
-                <Button variant="soft" onClick={() => openNewTx("OUT")}>
-                  <ArrowDownCircle className="h-4 w-4" /> Saída
-                </Button>
-                <Button variant="dark" onClick={() => openNewTx("IN")}>
-                  <ArrowUpCircle className="h-4 w-4" /> Entrada
-                </Button>
-              </>
-            ) : (
-              <Button variant="soft" onClick={loadAllCore}>
-                <Plus className="h-4 w-4" /> Recarregar
+              ) : null}
+              <Button variant="soft" onClick={() => openNewTx("OUT")}>
+                <ArrowDownCircle className="h-4 w-4" /> Lançar saída
               </Button>
-            )
+              <Button variant="primary" onClick={() => openNewTx("IN")}>
+                <ArrowUpCircle className="h-4 w-4" /> Lançar entrada
+              </Button>
+            </>
           }
         />
       </div>

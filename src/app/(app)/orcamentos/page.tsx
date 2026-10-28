@@ -91,6 +91,9 @@ function payLabel(b: Budget) {
     b.installmentAmountCents ?? Math.round(installmentTotal / count)
   );
 
+  if (String(b.paymentMode || "").toUpperCase() !== "PARCELADO") {
+    return `À vista • ${moneyBRLFromCents(cash)}`;
+  }
   return `À vista ${moneyBRLFromCents(cash)} • ${count}x de ${moneyBRLFromCents(installmentAmount)}`;
 }
 
@@ -101,8 +104,10 @@ function safeDateISO(dateInput: string) {
   return d.toISOString();
 }
 
-function findUnitCostCents(mat: Material | null) {
+function findSalePriceCents(mat: Material | null) {
   if (!mat) return 0;
+  const sale = mat.salePriceCents ?? 0;
+  if (sale > 0) return sale;
   const best = mat.bestSupplier?.unitCostCents ?? 0;
   if (best > 0) return best;
   const def = mat.defaultUnitCostCents ?? 0;
@@ -446,7 +451,7 @@ cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".",
   function maybeAutofillUnit(name: string, currentUnit: string) {
     if ((currentUnit || "").trim()) return currentUnit;
     const hit = materialsMap[String(name || "").trim().toLowerCase()] || null;
-    const cents = findUnitCostCents(hit);
+    const cents = findSalePriceCents(hit);
     return cents > 0
       ? String((cents / 100).toFixed(2)).replace(".", ",")
       : currentUnit;
@@ -549,6 +554,7 @@ cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".",
     Number.isFinite(parsedCard) && parsedCard >= 0 ? parsedCard : 0;
 
   const isCardInstallment =
+    String(form.paymentMode || "").toUpperCase() === "PARCELADO" &&
     String(form.paymentMethod || "").toUpperCase() === "CARTAO";
 
   const cardFeeCents = isCardInstallment
@@ -557,7 +563,9 @@ cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".",
 
   const installmentTotalCents = Math.max(0, grossTotalCents + cardFeeCents);
 
-  const installmentsCount = clamp(Number(form.installmentsCount || 3), 2, 24);
+  const installmentsCount = form.paymentMode === "PARCELADO"
+    ? clamp(Number(form.installmentsCount || 3), 2, 24)
+    : 1;
   const installmentAmountCents = Math.round(
     installmentTotalCents / installmentsCount
   );
@@ -604,7 +612,9 @@ cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".",
 }, [form, items, itemsInfo]);
 
 
-  const showCardFee = String(form.paymentMethod || "").toUpperCase() === "CARTAO";
+  const showCardFee =
+    form.paymentMode === "PARCELADO" &&
+    String(form.paymentMethod || "").toUpperCase() === "CARTAO";
 
   const kpis = useMemo(() => {
     const drafts = budgets.filter((b) => b.status === "RASCUNHO").length;
@@ -657,10 +667,13 @@ cardFeePercent: String(Number(b.cardFeePercent ?? 12.3).toFixed(2)).replace(".",
       expectedDeliveryAt = d.toISOString();
     }
 
-    const installmentsCount = clamp(Number(form.installmentsCount || 3), 2, 24);
-if (installmentsCount < 2 || installmentsCount > 24) {
-  return alert("Parcelas deve ser entre 2 e 24.");
-}
+    const isInstallment = form.paymentMode === "PARCELADO";
+    const installmentsCount = isInstallment
+      ? clamp(Number(form.installmentsCount || 3), 2, 24)
+      : 1;
+    if (isInstallment && (installmentsCount < 2 || installmentsCount > 24)) {
+      return alert("Parcelas deve ser entre 2 e 24.");
+    }
 
    const payload: SaveBudgetPayload = {
   clientId: form.clientId,
@@ -674,8 +687,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
   deliveryDays: calc.days,
   dailyRateCents: calc.dailyRateCents,
 
-  // técnico / compatibilidade até ajustarmos approveBudget
-  paymentMode: "PARCELADO",
+  paymentMode: form.paymentMode,
  paymentMethod:
   form.paymentMethod === "PIX" ||
   form.paymentMethod === "CARTAO" ||
@@ -686,7 +698,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
     ? form.paymentMethod
     : "CARTAO",
   installmentsCount,
-  firstDueDate: expectedDeliveryAt,
+  firstDueDate: isInstallment ? expectedDeliveryAt : null,
 
   profitPercent: calc.profitPercent,
   cardFeePercent: calc.cardFeePercent,
@@ -819,7 +831,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
                 )}
               </div>
               <div className="mt-2 font-display text-lg font-black text-[color:var(--ink)]">
-                Orçamentos premium
+                Orçamentos da oficina
               </div>
               <div className="mt-1 text-sm font-semibold text-[color:var(--muted)]">
                 Motor completo com materiais, custo diário, desconto à vista e taxa da maquininha.
@@ -1115,23 +1127,42 @@ if (installmentsCount < 2 || installmentsCount > 24) {
         Condições do orçamento
       </div>
       <div className="text-xs font-semibold text-[color:var(--muted)]">
-        O orçamento envia à vista com desconto e parcelado com taxa juntos.
+        Escolha venda à vista ou parcelada. Dinheiro muda automaticamente para à vista.
       </div>
     </div>
-    <Badge tone="wood">
-      <CreditCard className="h-3.5 w-3.5" /> À vista + Parcelado
+    <Badge tone={form.paymentMode === "PARCELADO" ? "wood" : "brand"}>
+      <CreditCard className="h-3.5 w-3.5" /> {form.paymentMode === "PARCELADO" ? "Parcelado" : "À vista"}
     </Badge>
   </div>
 
   <div className="mt-3 grid gap-3 sm:grid-cols-2">
     <div>
       <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
-        Método do parcelado
+        Condição de pagamento
+      </div>
+      <Select
+        value={form.paymentMode}
+        onChange={(e) =>
+          setForm((p) => ({ ...p, paymentMode: e.target.value as PayMode }))
+        }
+      >
+        <option value="AVISTA">À VISTA</option>
+        <option value="PARCELADO">PARCELADO</option>
+      </Select>
+    </div>
+
+    <div>
+      <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
+        Método de pagamento
       </div>
       <Select
         value={form.paymentMethod}
         onChange={(e) =>
-          setForm((p) => ({ ...p, paymentMethod: e.target.value }))
+          setForm((p) => ({
+            ...p,
+            paymentMethod: e.target.value,
+            paymentMode: e.target.value === "DINHEIRO" ? "AVISTA" : p.paymentMode,
+          }))
         }
       >
         <option value="CARTAO">CARTÃO</option>
@@ -1141,7 +1172,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
       </Select>
     </div>
 
-    <div>
+    {form.paymentMode === "PARCELADO" ? <div>
   <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
     Parcelas
   </div>
@@ -1163,9 +1194,9 @@ if (installmentsCount < 2 || installmentsCount > 24) {
       );
     })}
   </Select>
-</div>
+</div> : null}
 
-    <div>
+    {showCardFee ? <div>
       <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
         Taxa da maquininha (%)
       </div>
@@ -1176,7 +1207,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
         }
         placeholder="Ex: 12,30"
       />
-    </div>
+    </div> : null}
 
     <div>
       <div className="mb-1 text-xs font-extrabold text-[color:var(--muted)]">
@@ -1247,7 +1278,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
       </span>
     </div>
 
-    <div className="rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
+    {form.paymentMode === "PARCELADO" ? <div className="rounded-2xl border-2 border-[color:var(--line)] bg-[color:var(--bg-0)] p-3">
       <div className="text-xs font-extrabold text-[color:var(--muted)]">
         À vista
       </div>
@@ -1265,7 +1296,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
           {moneyBRLFromCents(calc.cashTotalCents)}
         </span>
       </div>
-    </div>
+    </div> : null}
 
     <div className="rounded-2xl border border-[color:var(--line)] bg-white/45 p-3">
       <div className="text-xs font-extrabold text-[color:var(--muted)]">
@@ -1392,8 +1423,8 @@ if (installmentsCount < 2 || installmentsCount > 24) {
                         <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">
                           Valor (R$)
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">
-                          Materiais
+                        <th className="bg-[color:var(--brand)] px-4 py-3 text-left text-xs font-black text-[color:var(--ink)]">
+                          Materiais • preencher
                         </th>
                         <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">
                           Custo
@@ -1487,10 +1518,10 @@ if (installmentsCount < 2 || installmentsCount > 24) {
                             <td className="px-4 py-3">
                               <Button
                                 variant="soft"
-                                className="w-full justify-center"
+                                className={`w-full justify-center border-[color:var(--wood)] ${it.materials?.length ? "bg-[rgba(255,210,63,0.45)]" : "bg-[rgba(255,112,67,0.18)]"}`}
                                 onClick={() => openMaterials(it.id)}
                               >
-                                <Boxes className="h-4 w-4" /> Materiais
+                                <Boxes className="h-4 w-4" /> {it.materials?.length ? `${it.materials.length} material(is)` : "Preencher materiais"}
                               </Button>
                             </td>
 
@@ -1526,7 +1557,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
       <Modal
         open={matOpen}
         title="Materiais do item"
-        subtitle="Sugere custo pelo estoque (bestSupplier/defaultUnitCost)."
+        subtitle="Ao escolher um item do estoque, o sistema usa o valor de venda cadastrado."
         onClose={closeMaterials}
         maxWidth="max-w-[1100px]"
         footer={
@@ -1584,7 +1615,7 @@ if (installmentsCount < 2 || installmentsCount > 24) {
                     Qtd
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-extrabold text-[color:var(--muted)]">
-                    Custo unit (R$)
+                    Valor de venda unit. (R$)
                   </th>
                   <th className="px-4 py-3 text-right text-xs font-extrabold text-[color:var(--muted)]">
                     Total

@@ -4,21 +4,22 @@
    TOKENS (Tailwind v4 - CSS-first)
    ========================= */
 @theme {
-  /* Sequência de fundo (obrigatória) */
-  --bg-0: #95adc1;
-  --bg-1: #b5c6d4;
-  --bg-2: #d4dee6;
-  --bg-3: #F5F8F9;
+  /* Oficina viva: cores sólidas, alegres e com contraste alto */
+  --bg-0: #fff4c7;
+  --bg-1: #fff9e7;
+  --bg-2: #f7f3e8;
+  --bg-3: #fffdf7;
   --bg-4: #ffffff;
 
   /* Ink / Navy (referência usa navy bem escuro) */
-  --ink: #0b1220;
-  --ink-2: rgba(11, 18, 32, 0.72);
-  --muted: rgba(11, 18, 32, 0.52);
+  --ink: #24324a;
+  --ink-2: #43516a;
+  --muted: #69758a;
 
   /* Brand */
-  --brand: #f7d320; /* amarelo principal */
-  --wood: #c2410c;  /* madeira/âmbar */
+  --brand: #ffd23f;
+  --wood: #ff7043;
+  --sky: #54c7ec;
 
   /* Status */
   --success: #16a34a;
@@ -26,18 +27,18 @@
   --danger:  #dc2626;
 
   /* Linhas / bordas suaves */
-  --line: rgba(11, 18, 32, 0.10);
-  --line-soft: rgba(11, 18, 32, 0.07);
+  --line: rgba(36, 50, 74, 0.18);
+  --line-soft: rgba(36, 50, 74, 0.12);
 
   /* Radius */
-  --r-board: 34px;
-  --r-card: 28px;
+  --r-board: 28px;
+  --r-card: 22px;
   --r-pill: 999px;
 
   /* Shadows (premium, suaves) */
-  --shadow-board: 0 26px 80px rgba(11, 18, 32, 0.18);
-  --shadow-card:  0 16px 44px rgba(11, 18, 32, 0.12);
-  --shadow-card-2: 0 22px 70px rgba(11, 18, 32, 0.14);
+  --shadow-board: 0 10px 0 rgba(36, 50, 74, 0.10);
+  --shadow-card: 0 5px 0 rgba(36, 50, 74, 0.10);
+  --shadow-card-2: 0 8px 0 rgba(36, 50, 74, 0.12);
 }
 
 /* =========================
@@ -50,6 +51,7 @@ body {
   color: var(--ink);
   overflow-x: hidden;
   text-rendering: geometricPrecision;
+  background: var(--bg-1);
 }
 
 .font-display { font-family: var(--font-display), var(--font-ui), system-ui, sans-serif; }
@@ -63,16 +65,7 @@ body {
   position: relative;
   min-height: 100dvh;
 
-  /* sequência principal */
-  background:
-    linear-gradient(
-      180deg,
-      var(--bg-0) 0%,
-      var(--bg-1) 22%,
-      var(--bg-2) 46%,
-      var(--bg-3) 74%,
-      var(--bg-4) 100%
-    );
+  background: var(--bg-1);
 }
 
 /* “neblina”/profundidade + glows (bem controlados) */
@@ -81,23 +74,15 @@ body {
   position: absolute;
   inset: 0;
   pointer-events: none;
-  background:
-    radial-gradient(900px 600px at 18% 8%, rgba(255,255,255,0.55), transparent 60%),
-    radial-gradient(700px 520px at 82% 12%, rgba(247,211,32,0.18), transparent 55%),
-    radial-gradient(700px 520px at 70% 88%, rgba(194,65,12,0.10), transparent 60%);
-  opacity: 0.95;
+  background-image:
+    radial-gradient(circle at 12px 12px, rgba(36, 50, 74, 0.08) 2px, transparent 2px),
+    linear-gradient(135deg, rgba(255, 210, 63, 0.16) 25%, transparent 25%);
+  background-size: 28px 28px, 140px 140px;
+  opacity: 0.7;
 }
 
 /* textura suave */
-.app-bg::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.10;
-  mix-blend-mode: multiply;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)' opacity='.55'/%3E%3C/svg%3E");
-}
+.app-bg::after { content: none; }
 
 /* blur adaptativo (performance) */
 :root { --glass-blur: 18px; }
@@ -109,11 +94,10 @@ body {
 .board {
   position: relative;
   border-radius: var(--r-board);
-  border: 1px solid rgba(255,255,255,0.55);
-  background:
-    linear-gradient(180deg, rgba(245,248,249,0.78) 0%, rgba(255,255,255,0.58) 100%);
+  border: 2px solid var(--line);
+  background: #fffdf7;
   box-shadow: var(--shadow-board);
-  backdrop-filter: blur(12px) saturate(1.08);
+  backdrop-filter: none;
 }
 
 /* =========================
@@ -123,52 +107,33 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: var(--r-card);
-  border: 1px solid var(--line-soft);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.86) 0%, rgba(245,248,249,0.62) 100%);
+  border: 2px solid var(--line-soft);
+  background: #ffffff;
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(var(--glass-blur)) saturate(1.22);
+  backdrop-filter: none;
 }
 
 /* highlight interno (o que dá cara “caro”) */
-.glass-card::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(800px 260px at 20% 0%, rgba(255,255,255,0.85), transparent 55%),
-    linear-gradient(180deg, rgba(255,255,255,0.55) 0%, transparent 42%);
-  opacity: 0.75;
-}
+.glass-card::before { content: none; }
 
 /* linha de borda interna sutil */
-.glass-card::after {
-  content: "";
-  position: absolute;
-  inset: 1px;
-  pointer-events: none;
-  border-radius: calc(var(--r-card) - 1px);
-  border: 1px solid rgba(255,255,255,0.55);
-  opacity: 0.7;
-}
+.glass-card::after { content: none; }
 
 /* PILL (tabs/badges estilo referência) */
 .pill {
   border-radius: var(--r-pill);
-  border: 1px solid rgba(11,18,32,0.10);
-  background: rgba(255,255,255,0.66);
-  backdrop-filter: blur(10px);
+  border: 2px solid var(--line-soft);
+  background: #ffffff;
+  backdrop-filter: none;
 }
 
 /* icon button estilo referência */
 .icon-btn {
   border-radius: 18px;
-  border: 1px solid rgba(11,18,32,0.10);
-  background:
-    linear-gradient(180deg, rgba(255,255,255,0.72) 0%, rgba(245,248,249,0.56) 100%);
-  box-shadow: 0 10px 24px rgba(11,18,32,0.10);
-  backdrop-filter: blur(10px);
+  border: 2px solid var(--line-soft);
+  background: #ffffff;
+  box-shadow: 0 3px 0 rgba(36,50,74,0.12);
+  backdrop-filter: none;
 }
 
 /* =========================
@@ -229,4 +194,16 @@ body {
 .safe-x {
   padding-left: calc(12px + env(safe-area-inset-left));
   padding-right: calc(12px + env(safe-area-inset-right));
+}
+.safe-bottom { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 3px solid var(--sky);
+  outline-offset: 2px;
+}
+
+@media (display-mode: standalone) {
+  body { overscroll-behavior-y: none; }
+  .app-bg { min-height: 100dvh; }
 }

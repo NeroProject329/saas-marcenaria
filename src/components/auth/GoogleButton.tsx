@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Input from "@/components/ui/Input";
 import Button from "@/components/ui/Button";
 import { useAuth } from "@/auth/AuthProvider";
+import { apiFetch } from "@/lib/api";
 
 declare global {
   interface Window {
@@ -46,6 +47,12 @@ export default function GoogleButton({ next }: Props) {
 
   const [pending, setPending] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [googleClientId, setGoogleClientId] = useState<string | null>(
+    process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || null
+  );
+  const [configLoaded, setConfigLoaded] = useState(
+    Boolean(process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID)
+  );
 
   const [needSalonName, setNeedSalonName] = useState(false);
   const [salonName, setSalonName] = useState("");
@@ -83,10 +90,33 @@ export default function GoogleButton({ next }: Props) {
   );
 
   useEffect(() => {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+    if (googleClientId) return;
 
-    if (!clientId) {
-      setErr("NEXT_PUBLIC_GOOGLE_CLIENT_ID não configurado.");
+    let cancelled = false;
+
+    apiFetch<{ googleClientId?: string | null }>("/api/auth/config")
+      .then((config) => {
+        if (!cancelled) setGoogleClientId(config?.googleClientId || null);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setErr("Não foi possível carregar a configuração de acesso com Google.");
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setConfigLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleClientId]);
+
+  useEffect(() => {
+    if (!configLoaded) return;
+
+    if (!googleClientId) {
+      setErr("Acesso com Google não configurado no servidor.");
       return;
     }
 
@@ -111,7 +141,7 @@ export default function GoogleButton({ next }: Props) {
       btnRef.current.innerHTML = "";
 
       window.google.accounts.id.initialize({
-        client_id: clientId,
+        client_id: googleClientId,
         callback: async (response) => {
           const credential = response?.credential;
           if (!credential) {
@@ -136,7 +166,7 @@ export default function GoogleButton({ next }: Props) {
     }, 250);
 
     return () => window.clearInterval(timer);
-  }, [finishGoogleAuth]);
+  }, [configLoaded, finishGoogleAuth, googleClientId]);
 
   async function onCompleteSignup() {
     if (!savedCredential) {

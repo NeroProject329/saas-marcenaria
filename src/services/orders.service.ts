@@ -1,5 +1,7 @@
 import type { Order, OrderItem, OrderInstallment } from "@/lib/types";
 import { apiFetch, ApiError } from "@/lib/api";
+import { getToken } from "@/lib/auth";
+import { API_URL } from "@/lib/env";
 
 function normalizeItem(it: any, idx = 0): OrderItem {
   const qty = Number(it.quantity ?? it.qty ?? 1) || 1;
@@ -191,4 +193,28 @@ export async function deleteOrder(id: string): Promise<void> {
     method: "DELETE",
     auth: true,
   });
+}
+
+export async function downloadOrderReceipt(id: string): Promise<Blob> {
+  const token = getToken();
+  if (!token) throw new Error("Sem token. Faça login novamente.");
+
+  const response = await fetch(`${API_URL.replace(/\/$/, "")}/api/orders/${id}/receipt.pdf?download=1`, {
+    headers: {
+      Accept: "application/pdf",
+      Authorization: `Bearer ${token}`,
+    },
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    let message = `Erro ${response.status} ao gerar comprovante.`;
+    try {
+      const data = await response.json();
+      if (data?.message) message = data.message;
+    } catch {}
+    throw new Error(message);
+  }
+
+  return response.blob();
 }

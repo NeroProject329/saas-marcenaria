@@ -44,49 +44,9 @@ function getMsg(data: any, status: number, path: string) {
   );
 }
 
-function isTokenExpiredMessage(msg: string) {
-  const m = (msg || "").toLowerCase();
-  return m.includes("token expirado") || m.includes("jwt expired") || m.includes("expir");
-}
-
-function setTokenRaw(token: string) {
-  // seu projeto usa localStorage token (padrão do painel)
-  if (typeof window !== "undefined") {
-    localStorage.setItem("token", token);
-  }
-}
-
-async function tryRefreshToken(expiredToken: string): Promise<string | null> {
-  try {
-    const url = buildUrl("/api/auth/refresh");
-
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        Accept: "application/json",
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${expiredToken}`,
-      },
-      body: JSON.stringify({ token: expiredToken }),
-      cache: "no-store",
-    });
-
-    const data = await readBody(res);
-    if (!res.ok) return null;
-
-    const newToken = data?.token;
-    if (typeof newToken === "string" && newToken.length > 10) return newToken;
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 async function apiFetchInternal<T = any>(
   path: string,
-  opts: ApiFetchOptions,
-  attempt: number
+  opts: ApiFetchOptions
 ): Promise<T> {
   const url = buildUrl(path);
 
@@ -134,34 +94,6 @@ async function apiFetchInternal<T = any>(
   // lê body uma vez
   const data = await readBody(res);
 
-  // ✅ tentativa de refresh automático quando expirar
-  if (res.status === 401 && opts.auth && attempt === 0) {
-    const msg = getMsg(data, res.status, path);
-
-    if (isTokenExpiredMessage(String(msg))) {
-      const currentToken = token || getToken();
-      if (currentToken) {
-        const newToken = await tryRefreshToken(currentToken);
-        if (newToken) {
-          setTokenRaw(newToken);
-          // retry 1x
-          return apiFetchInternal<T>(path, opts, attempt + 1);
-        }
-      }
-
-      // se não conseguiu renovar:
-      // ✅ só desloga automático no /auth/me (mesma regra que você já tinha)
-      if (path.startsWith("/api/auth/me")) {
-        clearToken();
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(new CustomEvent("auth:logout"));
-        }
-      }
-
-      throw new ApiError(msg, res.status, data);
-    }
-  }
-
   if (!res.ok) {
     // ✅ Só desloga automaticamente se o /auth/me disser 401
     if (res.status === 401 && path.startsWith("/api/auth/me")) {
@@ -182,5 +114,5 @@ async function apiFetchInternal<T = any>(
 }
 
 export async function apiFetch<T = any>(path: string, opts: ApiFetchOptions = {}): Promise<T> {
-  return apiFetchInternal<T>(path, opts, 0);
+  return apiFetchInternal<T>(path, opts);
 }

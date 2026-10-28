@@ -58,7 +58,7 @@ export default function Sidebar({
 
       <aside
         className={[
-          "fixed left-3 top-3 z-50 h-[calc(100dvh-24px)] w-[86vw] max-w-[320px] rounded-[30px] border border-[color:var(--line)] bg-white/55 p-3 shadow-[0_26px_80px_rgba(11,18,32,0.18)] backdrop-blur-[var(--glass-blur)] transition md:sticky md:left-auto md:top-0 md:z-auto md:h-auto md:w-[290px] md:translate-x-0 md:bg-white/45",
+          "fixed left-3 top-[calc(12px+env(safe-area-inset-top))] z-50 h-[calc(100dvh-24px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[86vw] max-w-[320px] rounded-[28px] border-2 border-[color:var(--line)] bg-[#fffdf7] p-3 shadow-[0_7px_0_rgba(36,50,74,0.16)] transition md:sticky md:left-auto md:top-0 md:z-auto md:h-auto md:w-[290px] md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-[120%] md:translate-x-0",
         ].join(" ")}
       >
@@ -91,7 +91,7 @@ export default function Sidebar({
         <div className="hidden px-2 pt-2 md:block">
           <div className="font-display text-sm font-black text-[color:var(--ink)]">Navegação</div>
           <div className="text-[11px] font-semibold text-[color:var(--muted)]">
-            Tudo no mesmo padrão premium
+            Sua oficina em um só lugar
           </div>
         </div>
 
@@ -106,8 +106,8 @@ export default function Sidebar({
   href={item.href}
   onClick={() => onClose()}
   className={[
-    "group flex items-center gap-3 rounded-[22px] px-3 py-2.5 transition",
-    active ? "bg-[rgba(247,211,32,0.28)] border border-black/10" : "hover:bg-white/55",
+    "group flex items-center gap-3 rounded-[20px] px-3 py-2.5 transition",
+    active ? "bg-[color:var(--brand)] border-2 border-[color:var(--ink)] shadow-[0_3px_0_var(--ink)]" : "border-2 border-transparent hover:bg-[color:var(--bg-0)]",
   ].join(" ")}
 >
                 <span

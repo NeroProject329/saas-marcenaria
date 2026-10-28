@@ -24,7 +24,7 @@ export default function BoardTopbar() {
   const current = TOP.find((t) => pathname?.startsWith(t.href))?.key || "dashboard";
 
   return (
-    <div className="pill flex w-full items-center justify-between gap-3 px-3 py-3 shadow-[0_26px_80px_rgba(11,18,32,0.14)]">
+    <div className="pill flex w-full items-center justify-between gap-3 px-3 py-3 shadow-[0_5px_0_rgba(36,50,74,0.14)]">
       {/* left brand */}
       <div className="flex items-center gap-3">
         <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgba(247,211,32,0.28)] shadow-sm">
@@ -32,7 +32,7 @@ export default function BoardTopbar() {
         </div>
         <div className="hidden leading-tight lg:block">
           <div className="font-display text-sm font-black text-[color:var(--ink)]">Gestão Marcenaria</div>
-          <div className="text-[11px] font-semibold text-[color:var(--muted)]">Painel Premium</div>
+          <div className="text-[11px] font-semibold text-[color:var(--muted)]">Painel da oficina</div>
         </div>
       </div>
 

@@ -8,7 +8,7 @@ export default function Select({
     <select
       className={cn(
         "pill h-10 w-full px-3 text-sm font-semibold text-[color:var(--ink)] outline-none",
-        "focus:border-black/15 focus:ring-4 focus:ring-[rgba(149,173,193,0.35)]",
+        "focus:border-[color:var(--ink)] focus:ring-4 focus:ring-[rgba(84,199,236,0.30)]",
         className
       )}
       {...props}

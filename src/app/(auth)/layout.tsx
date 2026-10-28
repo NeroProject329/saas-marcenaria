@@ -9,7 +9,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         strategy="afterInteractive"
       />
 
-      <div className="safe-x mx-auto flex min-h-dvh w-full items-center justify-center px-3 py-10">
+      <div className="safe-top safe-x safe-bottom mx-auto flex min-h-dvh w-full items-center justify-center px-3 py-10">
         <div className="w-full max-w-[520px]">{children}</div>
       </div>
     </AuthProvider>

@@ -13,17 +13,17 @@ export default function Button({
   size?: Size;
 }) {
   const base =
-    "inline-flex items-center justify-center gap-2 rounded-xl font-extrabold transition active:translate-y-[1px] disabled:opacity-60 disabled:pointer-events-none";
+    "inline-flex items-center justify-center gap-2 rounded-xl font-extrabold transition duration-200 active:translate-y-[2px] active:shadow-none disabled:opacity-60 disabled:pointer-events-none";
 
   const variants: Record<Variant, string> = {
     primary:
-      "bg-[color:var(--brand)] text-[color:var(--ink)] border border-black/10 shadow-[0_14px_26px_rgba(247,211,32,0.22)] hover:brightness-[0.99]",
+      "bg-[color:var(--brand)] text-[color:var(--ink)] border-2 border-[color:var(--ink)] shadow-[0_4px_0_var(--ink)] hover:-translate-y-0.5",
     soft:
-      "bg-[rgba(255,255,255,0.66)] text-[color:var(--ink)] border border-[color:var(--line)] hover:bg-white/75",
+      "bg-white text-[color:var(--ink)] border-2 border-[color:var(--line)] shadow-[0_3px_0_rgba(36,50,74,0.12)] hover:bg-[color:var(--bg-0)]",
     ghost:
-      "bg-transparent text-[color:var(--ink)] border border-transparent hover:bg-white/55 hover:border-[color:var(--line)]",
+      "bg-transparent text-[color:var(--ink)] border-2 border-transparent hover:bg-[color:var(--bg-0)] hover:border-[color:var(--line)]",
     dark:
-      "bg-[color:var(--ink)] text-white border border-black/20 shadow-[0_14px_28px_rgba(11,18,32,0.18)] hover:brightness-[1.02]",
+      "bg-[color:var(--ink)] text-white border-2 border-[color:var(--ink)] shadow-[0_4px_0_rgba(36,50,74,0.26)] hover:-translate-y-0.5",
   };
 
   const sizes: Record<Size, string> = {

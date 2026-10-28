@@ -16,13 +16,13 @@ export default function PageHeader({
     <div className="flex flex-wrap items-end justify-between gap-3">
       <div>
         <div className="flex items-center gap-2">
-          <h1 className="font-display text-xl font-black tracking-tight text-[color:var(--ink)] sm:text-2xl">
+          <h1 className="font-display text-2xl font-black tracking-[-0.04em] text-[color:var(--ink)] sm:text-3xl">
             {title}
           </h1>
           {badge ? <Badge tone={badge.tone || "ink"}>{badge.label}</Badge> : null}
         </div>
         {subtitle ? (
-          <p className="mt-1 max-w-2xl text-sm font-semibold text-[color:var(--muted)]">
+          <p className="mt-1 max-w-2xl text-sm font-bold leading-relaxed text-[color:var(--muted)]">
             {subtitle}
           </p>
         ) : null}

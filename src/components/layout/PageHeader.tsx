@@ -28,7 +28,11 @@ export default function PageHeader({
         ) : null}
       </div>
 
-      {right ? <div className="flex items-center gap-2">{right}</div> : null}
+      {right ? (
+        <div className="flex w-full min-w-0 max-w-full items-center gap-2 sm:w-auto">
+          {right}
+        </div>
+      ) : null}
     </div>
   );
 }

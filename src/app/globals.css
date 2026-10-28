@@ -196,6 +196,20 @@ body {
   padding-right: calc(12px + env(safe-area-inset-right));
 }
 .safe-bottom { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.mobile-bottom-safe {
+  padding-right: max(8px, env(safe-area-inset-right));
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-left: max(8px, env(safe-area-inset-left));
+}
+.modal-safe {
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-right: max(16px, env(safe-area-inset-right));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+}
+.modal-panel {
+  width: min(100%, calc(100vw - 32px));
+}
 
 button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
 button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible {

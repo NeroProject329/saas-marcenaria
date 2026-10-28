@@ -50,7 +50,7 @@ export default function Sidebar({
       <button
         onClick={onClose}
         className={[
-          "fixed inset-0 z-40 bg-black/35 backdrop-blur-sm transition md:hidden",
+          "fixed inset-0 z-40 bg-black/35 backdrop-blur-sm transition lg:hidden",
           open ? "opacity-100" : "pointer-events-none opacity-0",
         ].join(" ")}
         aria-label="Fechar menu"
@@ -58,12 +58,12 @@ export default function Sidebar({
 
       <aside
         className={[
-          "fixed left-3 top-[calc(12px+env(safe-area-inset-top))] z-50 h-[calc(100dvh-24px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[86vw] max-w-[320px] rounded-[28px] border-2 border-[color:var(--line)] bg-[color:var(--bg-3)] p-3 shadow-[0_7px_0_rgba(36,50,74,0.20)] transition md:sticky md:left-auto md:top-0 md:z-auto md:h-auto md:w-[290px] md:translate-x-0",
-          open ? "translate-x-0" : "-translate-x-[120%] md:translate-x-0",
+          "fixed left-3 top-[calc(12px+env(safe-area-inset-top))] z-50 h-[calc(100dvh-24px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[86vw] max-w-[320px] rounded-[28px] border-2 border-[color:var(--line)] bg-[color:var(--bg-3)] p-3 shadow-[0_7px_0_rgba(36,50,74,0.20)] transition lg:sticky lg:left-auto lg:top-0 lg:z-auto lg:h-auto lg:w-[290px] lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-[120%] lg:translate-x-0",
         ].join(" ")}
       >
         {/* header mobile */}
-        <div className="flex items-center justify-between gap-2 p-2 md:hidden">
+        <div className="flex items-center justify-between gap-2 p-2 lg:hidden">
           <div className="flex items-center gap-2">
             <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgba(247,211,32,0.28)]">
               <span className="font-display text-sm font-black text-[color:var(--ink)]">M</span>
@@ -88,7 +88,7 @@ export default function Sidebar({
         </div>
 
         {/* title desktop */}
-        <div className="hidden px-2 pt-2 md:block">
+        <div className="hidden px-2 pt-2 lg:block">
           <div className="font-display text-sm font-black text-[color:var(--ink)]">Navegação</div>
           <div className="text-[11px] font-semibold text-[color:var(--muted)]">
             Sua oficina em um só lugar

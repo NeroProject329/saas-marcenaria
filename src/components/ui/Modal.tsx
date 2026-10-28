@@ -63,9 +63,10 @@ export default function Modal({
       />
 
       {/* container centralizado */}
-      <div className="relative z-[101] flex min-h-full items-center justify-center p-4 sm:p-6">
-        <div className={`w-full ${maxWidth} my-6`}>
-          <GlassCard className="overflow-hidden p-0">
+      <div className="modal-safe relative z-[101] flex min-h-full items-center justify-center">
+        <div className="modal-panel my-6 min-w-0">
+          <div className={`mx-auto min-w-0 w-full ${maxWidth}`}>
+            <GlassCard className="overflow-hidden p-0">
             {/* header */}
             <div className="flex items-start justify-between gap-3 border-b border-[color:var(--line)] bg-white/35 px-5 py-4">
               <div className="min-w-0">
@@ -87,7 +88,7 @@ export default function Modal({
             </div>
 
             {/* body com scroll interno (mantém o modal no meio) */}
-            <div className="max-h-[calc(100vh-220px)] overflow-y-auto px-5 py-4">
+            <div className="max-h-[calc(100dvh-220px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] overflow-y-auto px-5 py-4">
               {children}
             </div>
 
@@ -97,7 +98,8 @@ export default function Modal({
                 {footer}
               </div>
             ) : null}
-          </GlassCard>
+            </GlassCard>
+          </div>
         </div>
       </div>
     </div>,

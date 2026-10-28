@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+    <meta name="theme-color" content="#24324a" />
+    <title>Gestão Marcenaria — Sem conexão</title>
+    <style>
+      :root { color-scheme: light; font-family: system-ui, sans-serif; }
+      * { box-sizing: border-box; }
+      body {
+        min-height: 100dvh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: max(20px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(20px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+        color: #24324a;
+        background: #d8d3c5;
+      }
+      main {
+        width: min(100%, 420px);
+        padding: 28px;
+        border: 2px solid #24324a;
+        border-radius: 24px;
+        background: #f5f3ec;
+        box-shadow: 0 8px 0 rgba(36, 50, 74, 0.18);
+      }
+      .mark {
+        width: 48px;
+        height: 48px;
+        display: grid;
+        place-items: center;
+        border: 2px solid #24324a;
+        border-radius: 16px;
+        background: #ffd23f;
+        font-weight: 900;
+      }
+      h1 { margin: 20px 0 8px; font-size: 24px; }
+      p { margin: 0; line-height: 1.55; font-weight: 600; color: #43516a; }
+      button {
+        width: 100%;
+        min-height: 48px;
+        margin-top: 22px;
+        border: 2px solid #24324a;
+        border-radius: 14px;
+        color: white;
+        background: #24324a;
+        font: inherit;
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark">M</div>
+      <h1>Você está sem conexão</h1>
+      <p>Assim que a internet voltar, tente novamente para continuar usando a Gestão Marcenaria.</p>
+      <button type="button" onclick="location.reload()">Tentar novamente</button>
+    </main>
+  </body>
+</html>

@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Marcenaria",
   },
   icons: {
@@ -35,7 +35,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
-  themeColor: "#FFD23F",
+  themeColor: "#24324A",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

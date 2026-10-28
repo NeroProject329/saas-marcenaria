@@ -23,18 +23,18 @@ if (isAuth) {
 
   return (
     <div className="relative min-h-dvh w-full">
-      {/* mobile topbar fixo */}
+      {/* navegação móvel fixa no rodapé */}
       <Topbar onMenu={() => setMobileOpen(true)} />
 
       {/* desktop topbar sticky */}
-      <div className="hidden md:block safe-x mx-auto w-full px-4 pt-5">
+      <div className="safe-x mx-auto hidden w-full px-4 pt-5 lg:block">
         <div className="sticky top-5 z-40">
           <BoardTopbar />
         </div>
       </div>
 
       {/* layout */}
-      <div className="safe-x safe-bottom mx-auto w-full px-3 pb-10 pt-16 sm:px-4 sm:pt-20 md:pt-6">
+      <div className="safe-x mx-auto w-full px-3 pb-[calc(94px+env(safe-area-inset-bottom))] pt-3 sm:px-4 lg:pb-10 lg:pt-6">
         <div className="flex w-full gap-4">
           <Sidebar open={mobileOpen} onClose={() => setMobileOpen(false)} />
 

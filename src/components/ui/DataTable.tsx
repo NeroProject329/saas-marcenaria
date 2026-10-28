@@ -47,8 +47,45 @@ export default function DataTable<T>({
         </div>
       ) : null}
 
-      <div ref={ref} className="mt-3 overflow-auto rounded-2xl border border-[color:var(--line)] bg-white/35">
-        <table className="min-w-[900px] w-full text-sm">
+      <div ref={ref} className="mt-3">
+        <div className="space-y-2 lg:hidden">
+          {rows.length ? (
+            rows.map((row, idx) => (
+              <article
+                key={rowKey(row, idx)}
+                data-row
+                className="rounded-2xl border-2 border-[color:var(--line-card)] bg-white p-3 shadow-[0_3px_0_rgba(36,50,74,0.14)]"
+              >
+                <dl className="space-y-2.5">
+                  {columns.map((column, columnIndex) => (
+                    <div
+                      key={columnIndex}
+                      className="grid grid-cols-[minmax(88px,0.38fr)_minmax(0,0.62fr)] items-start gap-3 border-b border-[color:var(--line-soft)] pb-2.5 last:border-0 last:pb-0"
+                    >
+                      <dt className="text-[11px] font-extrabold text-[color:var(--muted)]">
+                        {column.header}
+                      </dt>
+                      <dd className="min-w-0 break-words text-right text-sm font-semibold text-[color:var(--ink)]">
+                        {column.cell(row)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </article>
+            ))
+          ) : (
+            <div className="rounded-2xl border-2 border-[color:var(--line-card)] bg-white px-4 py-8">
+              {empty || (
+                <div className="text-sm font-semibold text-[color:var(--muted)]">
+                  Nenhum registro.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="hidden overflow-auto rounded-2xl border border-[color:var(--line)] bg-white/35 lg:block">
+          <table className="min-w-[900px] w-full text-sm">
           <thead className="bg-white/55">
             <tr>
               {columns.map((c, i) => (
@@ -92,7 +129,8 @@ export default function DataTable<T>({
               </tr>
             )}
           </tbody>
-        </table>
+          </table>
+        </div>
       </div>
     </GlassCard>
   );

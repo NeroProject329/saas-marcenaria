@@ -121,6 +121,7 @@ export default function GoogleButton({ next }: Props) {
     }
 
     let tries = 0;
+    let resizeObserver: ResizeObserver | null = null;
     const timer = window.setInterval(() => {
       tries += 1;
 
@@ -138,7 +139,6 @@ export default function GoogleButton({ next }: Props) {
       }
 
       initializedRef.current = true;
-      btnRef.current.innerHTML = "";
 
       window.google.accounts.id.initialize({
         client_id: googleClientId,
@@ -153,19 +153,34 @@ export default function GoogleButton({ next }: Props) {
         },
       });
 
-      window.google.accounts.id.renderButton(btnRef.current, {
-        theme: "outline",
-        size: "large",
-        text: "continue_with",
-        shape: "pill",
-        width: 360,
-        logo_alignment: "left",
-      });
+      const renderGoogleButton = () => {
+        if (!window.google || !btnRef.current) return;
+
+        const availableWidth = Math.floor(btnRef.current.getBoundingClientRect().width);
+        const width = Math.max(200, Math.min(360, availableWidth));
+
+        btnRef.current.innerHTML = "";
+        window.google.accounts.id.renderButton(btnRef.current, {
+          theme: "outline",
+          size: "large",
+          text: "continue_with",
+          shape: "pill",
+          width,
+          logo_alignment: "left",
+        });
+      };
+
+      renderGoogleButton();
+      resizeObserver = new ResizeObserver(renderGoogleButton);
+      resizeObserver.observe(btnRef.current);
 
       window.clearInterval(timer);
     }, 250);
 
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      resizeObserver?.disconnect();
+    };
   }, [configLoaded, finishGoogleAuth, googleClientId]);
 
   async function onCompleteSignup() {

@@ -1,5 +1,11 @@
-const CACHE = "marcenaria-shell-v1";
-const SHELL = ["/manifest.webmanifest", "/app-icon.svg", "/icon-192.png", "/icon-512.png"];
+const CACHE = "marcenaria-shell-v2";
+const SHELL = [
+  "/offline.html",
+  "/manifest.webmanifest",
+  "/app-icon.svg",
+  "/icon-192.png",
+  "/icon-512.png",
+];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL)));
@@ -30,7 +36,7 @@ self.addEventListener("fetch", (event) => {
           caches.open(CACHE).then((cache) => cache.put(request, copy));
           return response;
         })
-        .catch(() => caches.match(request).then((cached) => cached || caches.match("/dashboard")))
+        .catch(() => caches.match(request).then((cached) => cached || caches.match("/offline.html")))
     );
     return;
   }

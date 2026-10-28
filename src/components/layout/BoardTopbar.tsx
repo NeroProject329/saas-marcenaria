@@ -24,10 +24,10 @@ export default function BoardTopbar() {
   const current = TOP.find((t) => pathname?.startsWith(t.href))?.key || "dashboard";
 
   return (
-    <div className="pill flex w-full items-center justify-between gap-3 px-3 py-3 shadow-[0_5px_0_rgba(36,50,74,0.14)]">
+    <div className="pill flex w-full items-center justify-between gap-3 !border-[color:var(--ink)] px-3 py-3 shadow-[0_5px_0_rgba(36,50,74,0.18)]">
       {/* left brand */}
       <div className="flex items-center gap-3">
-        <div className="grid h-11 w-11 place-items-center rounded-2xl bg-[rgba(247,211,32,0.28)] shadow-sm">
+        <div className="grid h-11 w-11 place-items-center rounded-2xl border-2 border-[color:var(--ink)] bg-[rgba(247,211,32,0.28)] shadow-[0_3px_0_rgba(36,50,74,0.16)]">
           <span className="font-display text-[15px] font-black text-[color:var(--ink)]">M</span>
         </div>
         <div className="hidden leading-tight lg:block">
@@ -53,22 +53,30 @@ export default function BoardTopbar() {
       <div className="flex items-center gap-2">
         {/* search some em telas menores */}
         <div className="hidden xl:block xl:w-[320px]">
-          <Input placeholder="Buscar..." />
+          <Input
+            className="!border-[color:var(--ink)] bg-[rgba(84,199,236,0.12)]"
+            placeholder="Buscar..."
+          />
         </div>
         <div className="xl:hidden">
-          <IconButton icon={Search} label="Buscar" />
+          <IconButton className="!border-[color:var(--ink)]" icon={Search} label="Buscar" />
         </div>
 
-        <IconButton icon={Grid2X2} label="Atalhos" />
-        <IconButton icon={Bell} label="Notificações" />
-        <IconButton icon={Settings} label="Configurações" onClick={() => go("/configuracoes")} />
+        <IconButton className="!border-[color:var(--ink)]" icon={Grid2X2} label="Atalhos" />
+        <IconButton className="!border-[color:var(--ink)]" icon={Bell} label="Notificações" />
+        <IconButton
+          className="!border-[color:var(--ink)]"
+          icon={Settings}
+          label="Configurações"
+          onClick={() => go("/configuracoes")}
+        />
 
         <button
           onClick={() => {
             logout();
             router.replace("/login");
           }}
-          className="ml-1 flex items-center gap-2 rounded-[18px] border border-[color:var(--line)] bg-white/60 px-3 py-2 hover:bg-white/70"
+          className="ml-1 flex items-center gap-2 rounded-[18px] border-2 border-[color:var(--ink)] bg-white px-3 py-2 transition-colors hover:bg-[rgba(84,199,236,0.12)]"
         >
           <div className="hidden text-right lg:block">
             <div className="text-xs font-black text-[color:var(--ink)]">{me?.name || "Usuário"}</div>

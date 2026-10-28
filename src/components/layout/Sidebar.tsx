@@ -58,7 +58,7 @@ export default function Sidebar({
 
       <aside
         className={[
-          "fixed left-3 top-[calc(12px+env(safe-area-inset-top))] z-50 h-[calc(100dvh-24px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[86vw] max-w-[320px] rounded-[28px] border-2 border-[color:var(--line)] bg-[#fffdf7] p-3 shadow-[0_7px_0_rgba(36,50,74,0.16)] transition md:sticky md:left-auto md:top-0 md:z-auto md:h-auto md:w-[290px] md:translate-x-0",
+          "fixed left-3 top-[calc(12px+env(safe-area-inset-top))] z-50 h-[calc(100dvh-24px-env(safe-area-inset-top)-env(safe-area-inset-bottom))] w-[86vw] max-w-[320px] rounded-[28px] border-2 border-[color:var(--line)] bg-[color:var(--bg-3)] p-3 shadow-[0_7px_0_rgba(36,50,74,0.20)] transition md:sticky md:left-auto md:top-0 md:z-auto md:h-auto md:w-[290px] md:translate-x-0",
           open ? "translate-x-0" : "-translate-x-[120%] md:translate-x-0",
         ].join(" ")}
       >

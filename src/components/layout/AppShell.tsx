@@ -40,7 +40,7 @@ if (isAuth) {
 
           <main className="min-w-0 flex-1">
             {/* container principal (pode ser card leve, mas não é “board atrás de tudo”) */}
-            <div className="rounded-[28px] border-2 border-[color:var(--line)] bg-[#fffdf7] shadow-[0_7px_0_rgba(36,50,74,0.10)]">
+            <div className="rounded-[28px] border-2 border-[color:var(--line)] bg-[color:var(--bg-3)] shadow-[0_7px_0_rgba(36,50,74,0.18)]">
               <div className="p-3 sm:p-4">
                 <RouteEnter>{children}</RouteEnter>
               </div>

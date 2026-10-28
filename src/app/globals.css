@@ -5,10 +5,10 @@
    ========================= */
 @theme {
   /* Oficina viva: cores sólidas, alegres e com contraste alto */
-  --bg-0: #fff4c7;
-  --bg-1: #fff9e7;
-  --bg-2: #f7f3e8;
-  --bg-3: #fffdf7;
+  --bg-0: #f5e7a9;
+  --bg-1: #d8d3c5;
+  --bg-2: #e8e4d9;
+  --bg-3: #f5f3ec;
   --bg-4: #ffffff;
 
   /* Ink / Navy (referência usa navy bem escuro) */
@@ -26,9 +26,10 @@
   --warning: #f59e0b;
   --danger:  #dc2626;
 
-  /* Linhas / bordas suaves */
-  --line: rgba(36, 50, 74, 0.18);
-  --line-soft: rgba(36, 50, 74, 0.12);
+  /* Linhas / bordas com contraste permanente */
+  --line: rgba(36, 50, 74, 0.48);
+  --line-card: rgba(36, 50, 74, 0.34);
+  --line-soft: rgba(36, 50, 74, 0.26);
 
   /* Radius */
   --r-board: 28px;
@@ -36,9 +37,9 @@
   --r-pill: 999px;
 
   /* Shadows (premium, suaves) */
-  --shadow-board: 0 10px 0 rgba(36, 50, 74, 0.10);
-  --shadow-card: 0 5px 0 rgba(36, 50, 74, 0.10);
-  --shadow-card-2: 0 8px 0 rgba(36, 50, 74, 0.12);
+  --shadow-board: 0 10px 0 rgba(36, 50, 74, 0.18);
+  --shadow-card: 0 5px 0 rgba(36, 50, 74, 0.15);
+  --shadow-card-2: 0 8px 0 rgba(36, 50, 74, 0.18);
 }
 
 /* =========================
@@ -75,10 +76,9 @@ body {
   inset: 0;
   pointer-events: none;
   background-image:
-    radial-gradient(circle at 12px 12px, rgba(36, 50, 74, 0.08) 2px, transparent 2px),
-    linear-gradient(135deg, rgba(255, 210, 63, 0.16) 25%, transparent 25%);
-  background-size: 28px 28px, 140px 140px;
-  opacity: 0.7;
+    radial-gradient(circle at 12px 12px, rgba(36, 50, 74, 0.10) 2px, transparent 2px);
+  background-size: 28px 28px;
+  opacity: 0.54;
 }
 
 /* textura suave */
@@ -95,7 +95,7 @@ body {
   position: relative;
   border-radius: var(--r-board);
   border: 2px solid var(--line);
-  background: #fffdf7;
+  background: var(--bg-3);
   box-shadow: var(--shadow-board);
   backdrop-filter: none;
 }
@@ -107,7 +107,7 @@ body {
   position: relative;
   overflow: hidden;
   border-radius: var(--r-card);
-  border: 2px solid var(--line-soft);
+  border: 2px solid var(--line-card);
   background: #ffffff;
   box-shadow: var(--shadow-card);
   backdrop-filter: none;
@@ -122,7 +122,7 @@ body {
 /* PILL (tabs/badges estilo referência) */
 .pill {
   border-radius: var(--r-pill);
-  border: 2px solid var(--line-soft);
+  border: 2px solid var(--line-card);
   background: #ffffff;
   backdrop-filter: none;
 }
@@ -130,9 +130,9 @@ body {
 /* icon button estilo referência */
 .icon-btn {
   border-radius: 18px;
-  border: 2px solid var(--line-soft);
+  border: 2px solid var(--line-card);
   background: #ffffff;
-  box-shadow: 0 3px 0 rgba(36,50,74,0.12);
+  box-shadow: 0 3px 0 rgba(36,50,74,0.16);
   backdrop-filter: none;
 }
 
